@@ -1,0 +1,38 @@
+# Auto detect text files and perform LF normalization
+* text=auto
+
+# Source code
+*.c text
+*.cpp text
+*.h text
+*.hpp text
+*.json text
+*.md text
+*.txt text
+*.yml text
+*.yaml text
+
+# Makefiles
+Makefile text
+*.mk text
+
+# Binary files
+*.jpg binary
+*.jpeg binary
+*.png binary
+*.gif binary
+*.ico binary
+*.dksh binary
+*.nro binary
+*.elf binary
+*.nacp binary
+*.o binary
+*.obj binary
+*.a binary
+*.lib binary
+*.so binary
+*.dll binary
+
+# Line ending normalization
+*.sh text eol=lf
+*.bat text eol=crlf

@@ -1,0 +1,48 @@
+# Build directories
+nxbuild/
+build/
+
+# Output files
+*.nro
+*.elf
+*.nacp
+*.map
+
+# Object files
+*.o
+*.obj
+
+# Dependency files
+*.d
+
+# Temporary files
+*.tmp
+*.temp
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Logs
+*.log
+
+# Archives
+*.zip
+*.tar.gz
+*.rar
+
+# Backup files
+*.bak
+*.backup
