@@ -51,7 +51,7 @@ struct CopyProgressInfo {
 };
 
 struct Controller final {
-    // 按键状态 (Button states)
+    // these are tap only
     bool A;
     bool B;
     bool X;
@@ -62,13 +62,13 @@ struct Controller final {
     bool R2;
     bool START;
     bool SELECT;
-    // 方向键状态 (D-pad states)
+    // these can be held
     bool LEFT;
     bool RIGHT;
     bool UP;
     bool DOWN;
-    
-    // 组合键状态 (Combination key states)
+    // RIGHT+A组合键相关变量 (RIGHT+A combination key related variables)
+    // 简单检测：只要两个键都按下就触发，避免重复触发 (Simple detection: trigger when both keys are pressed, avoid repeated triggering)
     bool RIGHT_AND_A = false; // RIGHT+A组合键状态 (RIGHT+A combination key state)
 
     static constexpr int MAX = 1000;
@@ -81,14 +81,15 @@ struct Controller final {
 
 struct AppEntry final {
     std::string name;
-    // 版本信息 (Version info)
+
     std::string display_version;
     AppID id;
     int image;
     bool selected{false};
     bool own_image{false};
     
-    // 图标缓存相关 (Icon cache related)
+    // 缓存的原始图标数据，避免重复从缓存读取
+    // Cached raw icon data to avoid repeated cache reads
     std::vector<unsigned char> cached_icon_data;
     bool has_cached_icon{false};
     std::string FILE_NAME;
@@ -98,7 +99,7 @@ struct AppEntry final {
     std::string MOD_TOTAL;
 };
 
-// MOD信息结构体 (MOD info structure)
+
 struct MODINFO final {
     std::string MOD_NAME;
     std::string MOD_NAME2;
@@ -107,7 +108,8 @@ struct MODINFO final {
     bool MOD_STATE{false};
 };
 
-// 资源加载任务类型枚举 (Resource loading task type enumeration)
+// 资源加载任务结构体
+// Resource loading task structure
 enum class ResourceTaskType {
     ICON     // 图标加载任务 (Icon loading task)
 };
@@ -120,14 +122,18 @@ struct ResourceLoadTask {
     ResourceTaskType task_type; // 任务类型 (Task type)
 };
 
-// 资源加载管理器类 (Resource load manager class)
+// 资源加载管理器
+// Resource loading manager
 class ResourceLoadManager {
 private:
-    // 任务比较器，用于优先队列排序 (Task comparator for priority queue sorting)
+    // 优先级队列比较器：优先级数值越小，优先级越高
+    // Priority queue comparator: lower priority value = higher priority
     struct TaskComparator {
         bool operator()(const ResourceLoadTask& a, const ResourceLoadTask& b) const {
-            // 优先级数值越小，优先级越高 (Lower priority value = higher priority)
-            return a.priority > b.priority;
+            if (a.priority != b.priority) {
+                return a.priority > b.priority; // 优先级高的在前 (Higher priority first)
+            }
+            return a.submit_time > b.submit_time; // 相同优先级按提交时间排序 (Same priority sorted by submit time)
         }
     };
     
@@ -149,33 +155,43 @@ public:
     void Loop();
 
 private:
-    // 应用程序信息获取相关方法 (Application info retrieval related methods)
-    // 尝试获取应用基本信息并使用图标缓存 (Try to get app basic info with icon cache)
+
+
+    // 快速获取应用基本信息并缓存图标数据
+    // Fast get application basic info and cache icon data
     bool TryGetAppBasicInfoWithIconCache(u64 application_id, AppEntry& entry);
     
-    // 异步扫描应用名称 (Asynchronously scan application names)
+    // 分离式扫描：第一阶段快速扫描应用名称
+    // Separated scanning: Phase 1 - Fast scan application names
     void FastScanNames(std::stop_token stop_token);
     
-    // 加载可见区域的图标 (Load icons for visible area)
+    // 基于视口的智能图标加载：根据光标位置优先加载可见区域的图标
+    // Viewport-aware smart icon loading: prioritize loading icons in visible area based on cursor position
     void LoadVisibleAreaIcons();
-    
-    // 获取MOD ID和子目录数量 (Get MOD ID and subdirectory count)
+
+    // 辅助函数：根据filename_path获取其下面的modid和modid下面的子目录名称（使用标准C库）
+    // Helper function: Get modid and subdirectory names under filename_path (using standard C library)
     std::pair<u64, std::string> GetModIdAndSubdirCountStdio(const std::string& filename_path);
     
-    // 比较MOD游戏版本 (Compare MOD game version)
+    // 对比mod版本和游戏版本是否一致的辅助函数 (Helper function to compare mod version and game version consistency)
     bool CompareModGameVersion(const std::string& mod_version, const std::string& game_version);
     
-    // 可见范围管理相关 (Visible range management related)
-    // 获取当前可见的应用范围 (Get currently visible application range)
+    
+    
+    // 计算当前可见区域的应用索引范围
+    // Calculate the index range of applications in current visible area
     std::pair<size_t, size_t> GetVisibleRange() const;
     
-    // 上次加载的范围缓存 (Last loaded range cache)
+    // 上次加载的可见区域范围，用于防抖
+    // Last loaded visible range for debouncing
     mutable std::pair<size_t, size_t> last_loaded_range{SIZE_MAX, SIZE_MAX};
     
-    // 上次加载时间，用于防抖 (Last load time for debouncing)
+    // 上次调用LoadVisibleAreaIcons的时间，用于防抖
+    // Last time LoadVisibleAreaIcons was called, for debouncing
     mutable std::chrono::steady_clock::time_point last_load_time{};
     
-    // 防抖延迟常量 (Debounce delay constant)
+    // 列表界面视口感知图标加载的防抖和缓存机制 (Debouncing and caching mechanism for list interface viewport-aware icon loading)
+
     static constexpr auto LOAD_DEBOUNCE_MS = std::chrono::milliseconds(100); // 防抖延迟100ms (100ms debounce delay)
 
     NVGcontext* vg{nullptr};
@@ -193,7 +209,7 @@ private:
     int More_PLAY_MOD_image{};
     int NONE_MOD_image{};
     
-    // MOD图标加载状态 (MOD icon loading status)
+    // MOD图标延迟加载标志位 (MOD icons lazy loading flag)
     bool mod_icons_loaded{false};
 
     util::AsyncFurture<void> async_thread;
@@ -208,21 +224,25 @@ private:
     static std::atomic<size_t> total_count;
     static std::atomic<bool> is_scan_running;
     
-    // 资源加载管理器 (Resource load manager)
+    
+
+    // 资源加载管理器
+    // Resource loading manager
     ResourceLoadManager resource_manager;
     
-    // 帧时间管理 (Frame time management)
+    // 每帧资源加载控制
+    // Per-frame resource loading control
     std::chrono::steady_clock::time_point last_frame_time;
     bool enable_frame_load_limit{true}; // 是否启用每帧加载限制 (Whether to enable per-frame load limit)
 
-    // UI布局相关常量和变量 (UI layout related constants and variables)
+    // this is just bad code, ignore it
     static constexpr float BOX_HEIGHT{120.f};
     float yoff{130.f};
     float ypos{130.f};
     std::size_t start{0};
     std::size_t index{}; // where i am in the array
     
-    // MOD列表相关变量 (MOD list related variables)
+    // MOD列表独立的索引变量 (Independent index variables for MOD list)
     std::size_t mod_index{0};  // MOD列表中的当前选中项索引 (Current selected item index in MOD list)
     std::size_t mod_start{0};  // MOD列表显示的起始索引 (Start index for MOD list display)
     float mod_yoff{130.f};     // MOD列表的Y坐标偏移量 (Y coordinate offset for MOD list)
@@ -239,7 +259,7 @@ private:
     
     int sort_type{0}; 
 
-    // 对话框相关变量 (Dialog related variables)
+    // 对话框相关成员变量 (Dialog related member variables)
     DialogType dialog_type{DialogType::INFO};  // 当前对话框类型 (Current dialog type)
     bool show_dialog{false};                   // 是否显示对话框 (Whether to show dialog)
     std::string dialog_content;                // 对话框内容 (Dialog content)
@@ -251,7 +271,7 @@ private:
 
     bool clean_button{false}; // 强制清理标签
     
-    // 复制进度相关变量 (Copy progress related variables)
+    // 复制进度相关字段 (Copy progress related fields)
     CopyProgressInfo copy_progress{};           // 复制进度信息 (Copy progress info)
     std::mutex copy_progress_mutex;            // 复制进度互斥锁 (Copy progress mutex)
     util::AsyncFurture<bool> copy_task;        // 异步复制任务 (Async copy task)
@@ -260,7 +280,7 @@ private:
     
     AudioManager audio_manager; // 音效管理器 (Audio manager)
 
-    // 教程界面相关变量 (Instruction interface related variables)
+    // 教程界面翻页变量 (Instruction interface pagination variable)
     int instruction_current_page{0};  // 当前页码 (Current page number)
 
     // 模组名称映射相关 (MOD name mapping related)
@@ -287,12 +307,19 @@ private:
     void DrawModList(); // 绘制MOD列表界面 (Draw MOD list interface)
     void DrawInstruction(); // 绘制教程界面 (Draw instruction interface)
     
-    // 对话框相关方法 (Dialog related methods)
-    // 显示对话框 (Show dialog)
-    // type: 对话框类型 (Dialog type)
-    // content: 对话框内容 (Dialog content)
-    // content_font_size: 内容字体大小 (Content font size)
-    // content_align: 内容对齐方式 (Content alignment)
+    // 对话框相关函数 (Dialog related functions)
+    /**
+     * 显示对话框
+     * @param type 对话框类型 (NONE, CONFIRM, INFO, WARNING)
+     * @param content 对话框内容文本
+     * @param content_font_size 内容字体大小，默认18.0f
+     * @param content_align 内容对齐方式，默认居中中间对齐 (NVG_ALIGN_CENTER | NVG_ALIGN_MIDDLE)
+     * 
+     * 对齐方式可选值：
+     * 水平对齐: NVG_ALIGN_LEFT, NVG_ALIGN_CENTER, NVG_ALIGN_RIGHT
+     * 垂直对齐: NVG_ALIGN_TOP, NVG_ALIGN_MIDDLE, NVG_ALIGN_BOTTOM, NVG_ALIGN_BASELINE
+     * 可以使用 | 操作符组合水平和垂直对齐方式
+     */
     void ShowDialog(DialogType type, const std::string& content,
                    float content_font_size = 18.0f,
                    int content_align = NVG_ALIGN_CENTER | NVG_ALIGN_MIDDLE);
@@ -302,21 +329,21 @@ private:
     void DrawDialog();
     void UpdateDialog();
 
-    // 模组名称映射相关方法 (MOD name mapping related methods)
+    // 模组名称映射相关函数 (MOD name mapping related functions)
     bool LoadModNameMapping(const std::string& game_name, const std::string& FILE_PATH); // 加载指定游戏的模组名称映射 (Load MOD name mapping for specified game)
     std::string GetMappedModName(const std::string& original_name, const std::string& mod_type); // 获取映射后的模组名称 (Get mapped MOD name)
     std::string GetModDescription(const std::string& original_name, const std::string& mod_type); // 获取模组描述 (Get MOD description)
     void ClearModNameCache(); // 清空映射缓存 (Clear mapping cache)
 
-    // 游戏名称映射相关方法 (Game name mapping related methods)
+    // 游戏名称映射相关函数 (Game name mapping related functions)
     bool LoadGameNameMapping(); // 加载游戏名称映射 (Load game name mapping)
     std::string GetMappedGameName(const std::string& original_name, const std::string& mod_version); // 获取映射后的游戏名称 (Get mapped game name)
     void ClearGameNameCache(); // 清空游戏名称映射缓存 (Clear game name mapping cache)
 
-    // 字符串格式化方法 (String formatting method)
+    // 字符串格式化辅助函数 (String formatting helper function)
     std::string GetSnprintf(const std::string& format_str, const std::string& value); // 格式化字符串，将%s替换为指定值 (Format string, replace %s with specified value)
 
-    // MOD相关操作方法 (MOD related operation methods)
+    // MOD相关函数 (MOD related functions)
     void FastScanModInfo(); // 快速扫描MOD信息 (Fast scan MOD info)
     void Sort_Mod(); // 排序MOD列表 (Sort MOD list)
     void ChangeModName(); // 切换当前选中模组的安装状态并修改名称 (Toggle current selected mod install status and modify name)
@@ -325,19 +352,21 @@ private:
 
     bool CopyFile(const std::string& source_path, const std::string& dest_path); // 复制单个文件 (Copy single file)
     
-    // 异步文件操作方法 (Async file operation methods)
+    // 异步复制相关函数 (Async copy related functions)
     bool CopyDirectoryRecursiveAsync(std::stop_token stop_token, const std::string& source_path, const std::string& dest_path, 
                                      std::function<void(const CopyProgressInfo&)> progress_callback); // 异步递归复制目录 (Async recursively copy directory)
     size_t CountFilesInDirectory(const std::string& path); // 统计目录中的文件数量 (Count files in directory)
     
-    // MOD文件删除相关方法 (MOD file deletion related methods)
-    // 选择性删除MOD文件，只删除与源MOD结构匹配的文件 (Selectively delete MOD files, only delete files matching source MOD structure)
+    // 删除目录相关函数 (Directory deletion related functions)
+    
+    // 选择性删除相关函数 (Selective deletion related functions)
     bool RemoveModFilesSelectively(std::stop_token stop_token, const std::string& mod_source_path, const std::string& target_path,
                                    std::function<void(const CopyProgressInfo&)> progress_callback); // 选择性删除MOD文件 (Selectively remove MOD files)
     size_t CountModFilesToRemove(const std::string& mod_source_path, const std::string& target_path); // 统计需要删除的MOD文件数量 (Count MOD files to remove)
 
-    // Deko3D渲染相关 (Deko3D rendering related)
-    // 以下代码来自nanovg deko3d示例，作者adubbz (Code below from nanovg deko3d example by adubbz)
+
+
+
 private: // from nanovg decko3d example by adubbz
     static constexpr unsigned NumFramebuffers = 2;
     static constexpr unsigned StaticCmdSize = 0x1000;
@@ -356,20 +385,23 @@ private: // from nanovg decko3d example by adubbz
     DkCmdList render_cmdlist;
     std::optional<nvg::DkRenderer> renderer;
     
-    // 动态命令缓冲区管理 (Dynamic command buffer management)
+    // GPU命令优化：双缓冲命令列表用于分离提交和执行
+    // GPU command optimization: Double-buffered command lists for separating submission and execution
     static constexpr unsigned NumCommandBuffers = 2;
     dk::UniqueCmdBuf dynamic_cmdbufs[NumCommandBuffers];
     DkCmdList dynamic_cmdlists[NumCommandBuffers];
     unsigned current_cmdbuf_index{0};
     bool command_submitted[NumCommandBuffers]{false, false};
     
-    // 命令同步相关 (Command synchronization related)
+    // GPU同步对象用于跟踪命令执行状态
+    // GPU synchronization objects for tracking command execution status
     dk::Fence command_fences[NumCommandBuffers];
     void createFramebufferResources();
     void destroyFramebufferResources();
     void recordStaticCommands();
     
-    // 命令缓冲区管理方法 (Command buffer management methods)
+    // GPU命令优化相关函数
+    // GPU command optimization related functions
     void prepareNextCommandBuffer();
     void submitCurrentCommandBuffer();
     void waitForCommandCompletion(unsigned buffer_index);

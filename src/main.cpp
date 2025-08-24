@@ -1,22 +1,42 @@
-#include <switch.h>
 #include "app.hpp"
 #include "utils/logger.hpp"
+#include <switch.h>
 
-int main(int argc, char* argv[]) {
-    // 初始化系统服务
-    consoleInit(nullptr);
+extern "C" {
+#ifndef NDEBUG
+#include <unistd.h> // for close()
+static int nxlink_socket;
+#endif // NDEBUG
+#define THROW_IF(func) if (auto r = func; R_FAILED(r)) fatalThrow(r);
+
+void userAppInit(void) {
+    THROW_IF(appletLockExit());
+    THROW_IF(romfsInit());
+    THROW_IF(plInitialize(PlServiceType_User));
+    THROW_IF(nsInitialize());
+#ifndef NDEBUG
+    THROW_IF(socketInitializeDefault());
+    nxlink_socket = nxlinkStdio();
+#endif // NDEBUG
+}
+
+void userAppExit(void) {
+#ifndef NDEBUG
+    close(nxlink_socket);
+    socketExit();
+#endif // NDEBUG
+    plExit();
+    nsExit();
+    romfsExit();
+    appletUnlockExit();
+}
+} // extern "C"
+
+int main(int argc, char** argv) {
+    // 初始化日志系统 (Initialize logging system)
+    ::utils::Logger::Initialize();
     
-    // 设置日志级别
-    tj::Logger::SetLevel(tj::Logger::Level::INFO);
-    
-    // 创建应用程序实例
-    tj::App app;
-    
-    // 运行主循环
+    tj::App app{};
     app.Loop();
-    
-    // 清理资源
-    consoleExit(nullptr);
-    
     return 0;
 }

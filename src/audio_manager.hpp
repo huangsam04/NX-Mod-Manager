@@ -1,123 +1,124 @@
+/**
+ * @file audio_manager.hpp
+ * @brief 音效管理器类，使用switch-libpulsar播放Switch系统自带音效
+ */
 #pragma once
 
 #include <switch.h>
-#include <string>
-#include <memory>
-#include <unordered_map>
-#include <mutex>
+#include <pulsar.h>
+#include <chrono>
+#include "async.hpp"
 
-namespace tj {
-
-// 音效类型枚举 (Audio effect type enumeration)
-enum class AudioType {
-    BUTTON_CLICK,    // 按钮点击音效 (Button click sound effect)
-    BUTTON_HOVER,    // 按钮悬停音效 (Button hover sound effect)
-    CONFIRM,         // 确认音效 (Confirmation sound effect)
-    CANCEL,          // 取消音效 (Cancel sound effect)
-    ERROR,           // 错误音效 (Error sound effect)
-    SUCCESS,         // 成功音效 (Success sound effect)
-    NOTIFICATION,    // 通知音效 (Notification sound effect)
-};
-
-// 音频数据结构体 (Audio data structure)
-struct AudioData {
-    std::unique_ptr<u8[]> data;  // 音频数据指针 (Audio data pointer)
-    size_t size;                 // 数据大小 (Data size)
-    u32 sample_rate;             // 采样率 (Sample rate)
-    u16 channels;                // 声道数 (Number of channels)
-    u16 bits_per_sample;         // 每样本位数 (Bits per sample)
-    
-    AudioData() = default;
-    AudioData(const AudioData&) = delete;
-    AudioData& operator=(const AudioData&) = delete;
-    
-    // 移动构造函数 (Move constructor)
-    AudioData(AudioData&& other) noexcept
-        : data(std::move(other.data))
-        , size(other.size)
-        , sample_rate(other.sample_rate)
-        , channels(other.channels)
-        , bits_per_sample(other.bits_per_sample) {
-        other.size = 0;
-        other.sample_rate = 0;
-        other.channels = 0;
-        other.bits_per_sample = 0;
-    }
-    
-    // 移动赋值操作符 (Move assignment operator)
-    AudioData& operator=(AudioData&& other) noexcept {
-        if (this != &other) {
-            data = std::move(other.data);
-            size = other.size;
-            sample_rate = other.sample_rate;
-            channels = other.channels;
-            bits_per_sample = other.bits_per_sample;
-            
-            other.size = 0;
-            other.sample_rate = 0;
-            other.channels = 0;
-            other.bits_per_sample = 0;
-        }
-        return *this;
-    }
-};
-
-// 音效管理器类 (Audio manager class)
+/**
+ * @brief 音效管理器类
+ * 负责初始化音频系统、加载系统音效并提供播放接口
+ */
 class AudioManager {
 public:
+    /**
+     * @brief 构造函数
+     */
     AudioManager();
+    
+    /**
+     * @brief 析构函数
+     */
     ~AudioManager();
     
-    // 禁止拷贝构造和赋值 (Disable copy construction and assignment)
-    AudioManager(const AudioManager&) = delete;
-    AudioManager& operator=(const AudioManager&) = delete;
-    
-    // 初始化音频系统 (Initialize audio system)
+    /**
+     * @brief 初始化音效系统
+     * @return 成功返回true，失败返回false
+     */
     bool Initialize();
     
-    // 清理音频系统 (Cleanup audio system)
+    /**
+     * @brief 异步初始化音效系统
+     * 在后台线程中执行耗时的I/O操作，避免阻塞启动流程
+     */
+    void InitializeAsync();
+    
+    /**
+     * @brief 检查异步初始化是否完成
+     * @return 完成返回true，否则返回false
+     */
+    bool IsAsyncInitComplete() const;
+    
+    /**
+     * @brief 请求停止异步初始化
+     */
+    void RequestStop();
+    
+    /**
+     * @brief 清理音效系统
+     */
     void Cleanup();
     
-    // 播放指定类型的音效 (Play specified type of sound effect)
-    void PlaySound(AudioType type);
+    /**
+     * @brief 播放按键音效
+     * @param volume 音量 (0.0f - 1.0f)
+     */
+    void PlayKeySound(float volume = 1.0f);
     
-    // 播放自定义音效文件 (Play custom sound effect file)
-    bool PlaySoundFile(const std::string& file_path);
+    /**
+     * @brief 播放确认音效
+     * @param volume 音量 (0.0f - 1.0f)
+     */
+    void PlayConfirmSound(float volume = 1.0f);
     
-    // 设置主音量 (Set master volume)
-    void SetMasterVolume(float volume); // 0.0f - 1.0f
+    /**
+     * @brief 播放取消音效
+     * @param volume 音量 (0.0f - 1.0f)
+     */
+    void PlayCancelSound(float volume = 1.0f);
     
-    // 获取主音量 (Get master volume)
-    float GetMasterVolume() const;
+    /**
+     * @brief 播放滚动音效
+     * @param volume 音量 (0.0f - 1.0f)
+     */
+    // void PlayScrollSound(float volume = 1.0f);
     
-    // 设置音效开关 (Set sound effect on/off)
-    void SetSoundEnabled(bool enabled);
+    /**
+     * @brief 播放限制/边界音效
+     * @param volume 音量 (0.0f - 1.0f)
+     */
+    void PlayLimitSound(float volume = 1.0f);
     
-    // 获取音效开关状态 (Get sound effect on/off status)
-    bool IsSoundEnabled() const;
+    /**
+     * @brief 播放启动音效
+     * @param volume 音量 (0.0f - 1.0f)
+     */
+    // void PlayStartupSound(float volume = 1.0f);
     
-    // 预加载音效资源 (Preload sound effect resources)
-    bool PreloadSounds();
-    
-    // 检查音频系统是否已初始化 (Check if audio system is initialized)
-    bool IsInitialized() const;
+    /**
+     * @brief 检查音效系统是否已初始化
+     * @return 已初始化返回true，否则返回false
+     */
+    bool IsInitialized() const { return m_initialized; }
     
 private:
-    bool initialized_{false};           // 是否已初始化 (Whether initialized)
-    bool sound_enabled_{true};          // 音效是否启用 (Whether sound effects are enabled)
-    float master_volume_{0.8f};         // 主音量 (Master volume)
+    bool m_initialized;                    ///< 初始化状态
+    bool m_async_init_started;            ///< 异步初始化是否已开始
+    util::AsyncFurture<void> m_async_init_future; ///< 异步初始化任务
+    std::stop_source m_stop_source;       ///< 停止信号源
+    std::stop_token m_stop_token;         ///< 停止令牌
+    PLSR_BFSAR m_bfsar;                   ///< BFSAR音频档案
+    PLSR_PlayerSoundId m_keySoundId;      ///< 按键音效ID (SeGameIconFocus)
+    PLSR_PlayerSoundId m_confirmSoundId;  ///< 确认音效ID (SeGameIconAdd)
+    PLSR_PlayerSoundId m_cancelSoundId;   ///< 取消音效ID (SeInsertError)
+    // PLSR_PlayerSoundId m_scrollSoundId;   ///< 滚动音效ID (SeGameIconScroll)
+    PLSR_PlayerSoundId m_limitSoundId;    ///< 限制/边界音效ID (SeGameIconLimit)
+    // PLSR_PlayerSoundId m_startupSoundId;  ///< 启动音效ID (StartupMenu_Game)
     
-    // 音效数据缓存 (Sound effect data cache)
-    std::unordered_map<AudioType, AudioData> audio_cache_;
-    mutable std::mutex audio_mutex_;    // 音频操作互斥锁 (Audio operation mutex)
+    // 防抖机制相关变量 (Debounce mechanism related variables)
+    static constexpr auto AUDIO_DEBOUNCE_MS = std::chrono::milliseconds(120); ///< 音效防抖间隔120ms
+    std::chrono::steady_clock::time_point m_lastKeySoundTime{};     ///< 上次按键音效播放时间
+    std::chrono::steady_clock::time_point m_lastConfirmSoundTime{}; ///< 上次确认音效播放时间
+    std::chrono::steady_clock::time_point m_lastCancelSoundTime{};  ///< 上次取消音效播放时间
+    std::chrono::steady_clock::time_point m_lastLimitSoundTime{};   ///< 上次限制音效播放时间
     
-    // 内部方法 (Internal methods)
-    bool LoadAudioFile(const std::string& file_path, AudioData& audio_data);
-    bool LoadDefaultSounds(); // 加载默认音效 (Load default sound effects)
-    void PlayAudioData(const AudioData& audio_data);
-    
-    // 音频类型到文件路径的映射 (Mapping from audio type to file path)
-    std::string GetAudioFilePath(AudioType type) const;
+    /**
+     * @brief 加载系统音效
+     * @return 成功返回true，失败返回false
+     */
+    bool LoadSystemSounds();
 };
-
-} // namespace tj
