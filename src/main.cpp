@@ -1,5 +1,4 @@
 #include "app.hpp"
-#include "utils/logger.hpp"
 #include <switch.h>
 
 extern "C" {
@@ -33,8 +32,6 @@ void userAppExit(void) {
 } // extern "C"
 
 int main(int argc, char** argv) {
-    // 初始化日志系统 (Initialize logging system)
-    ::utils::Logger::Initialize();
     
     tj::App app{};
     app.Loop();

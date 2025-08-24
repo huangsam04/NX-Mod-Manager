@@ -8,8 +8,6 @@
 #include "nanovg/stb_image.h"
 // 语言管理器 (Language manager)
 #include "lang_manager.hpp"
-// 日志系统 (Logger system)
-#include "utils/logger.hpp"
 // 时间计算 (Time calculation)
 #include <chrono>
 // 原子操作 (Atomic operations)
