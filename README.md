@@ -1,38 +1,148 @@
 # NX Mod Manager
 
-一个专为Nintendo Switch设计的模组管理器，支持多语言界面和音效反馈，提供直观的模组安装、卸载和管理功能。
-
-
+一个专为Nintendo Switch设计的模组管理器，支持多语言界面，音效反馈，名称映射，提供直观的模组安装、卸载和管理功能。
 
 ## 使用方法
 
+### 完整目录结构图
 
-
-### 模组安装流程
-
-1. **扫描检测**: 程序自动扫描SD卡中的模组
-2. **版本检查**: 验证模组与游戏版本的兼容性
-3. **类型识别**: 根据标签自动识别模组类型
-4. **安装确认**: 显示安装进度和结果
-5. **状态更新**: 实时更新
-
-### 模组目录结构
+以下是SD卡中模组的完整目录结构示例：
 
 ```
-SD卡/mods2/
-└── 游戏名[版本]/
-    └── 游戏ID/
-        └── 模组名[类型]/
-            ├── contents/           # LayeredFS模组
-            └── exefs_patches/      # 代码补丁模组
+SD卡
+└── mods2
+    ├── game_name.json                    # 游戏名称映射文件
+    ├── [游戏名1][版本标签]
+    │   └── [游戏ID]
+    │       ├── mod_name.json             # 模组名称映射文件
+    │       ├── [模组名称1][模组类型标签]
+    │       │   ├── contents
+    │       │   │   └── [具体模组内容]
+    │       │   └── exefs_patches
+    │       │       └── [具体模组内容]
+    │       └── [模组名称2][模组类型标签]
+    │           ├── contents
+    │           │   └── [具体模组内容]
+    │           └── exefs_patches
+    │               └── [具体模组内容]
+    │ 
+    ├── [游戏名2][版本标签]
+    │   └── [游戏ID]
+    │       ├── mod_name.json             # 模组名称映射文件
+    │       └── [模组名称][模组类型标签]
+    │           ├── contents
+    │           │   └── [具体模组内容]
+    │           └── exefs_patches
+    │               └── [具体模组内容]
+    │ 
+    └── [游戏名3][版本标签]
+        └── [游戏ID]
+            ├── mod_name.json             # 模组名称映射文件
+            └── [模组名称][模组类型标签]
+                ├── contents
+                │   └── [具体模组内容]
+                └── exefs_patches
+                    └── [具体模组内容]
 ```
 
-### 版本兼容性检查
+**目录结构说明**：
+- 每个游戏可以有多个模组
+- 每个模组可以同时包含`contents`和`exefs_patches`两种类型
 
-程序会自动检查模组版本与游戏版本的兼容性：
-- ✅ **版本可用**: 模组版本与游戏版本匹配
-- ❌ **版本不可用**: 版本不匹配，可能导致问题
-- ❓ **版本未知**: 无法确定版本信息
+### 模组目录文字说明
+
+模组使用目录：`SD卡/mods2`
+
+完整的模组路径格式：
+```
+mods2/游戏名字[模组版本标签]/游戏ID/模组名字[模组类型标签]/具体模组文件
+```
+
+**重要说明**：
+- 因为Switch文件系统不支持中文，所以整个路径全部用英文和数字，包括标点符号，否则无法识别
+- 游戏ID路径下可放有多个模组，如：模组名字1[模组类型标签]，模组名字2[模组类型标签]
+- 路径上若不标注标签，不影响实际使用，但建议标注，方便管理
+
+### 标签格式说明
+
+**版本标签格式**：`[版本号]`
+- 模组版本标签请按实际模组适用版本填写，只填数字即可
+- 例如：V1.2.0 写成 `[1.2.0]`
+
+**模组类型标签**：
+- `[F]`：帧率补丁
+- `[G]`：图形增强
+- `[B]`：游戏美化
+- `[P]`：更多玩法
+- `[C]`：金手指
+
+**注意**：标签格式为`[X]`，X为标签内容。为了避免识别出错，路径中非标签内容请不要使用`[]`括号。
+
+### 模组类型示例
+
+**Contents模组示例**（LayeredFS模组）：
+```
+Sentinels[1.0.0]/01008D7016438000/cheat code[C]/contents/01008D7016438000/cheats/F64F574.txt
+```
+
+**Exefs_patches模组示例**（代码补丁模组）：
+```
+Bayonetta[1.2.0]/01004A4010FEA000/720&900[G]/exefs_patches/Bayo3/F00DF.ips
+```
+
+### 名称映射配置
+
+#### 游戏名称映射
+
+映射的名字会代替原本文件目录的名字显示在程序里。
+
+**文件路径**：`SD卡/mods2/game_name.json`
+
+**格式**：
+```json
+{
+  "游戏文件夹的名字": "想要映射的名字"
+}
+```
+
+**示例**：
+```json
+{
+  "Celeste[1.0.0]": "蔚蓝",
+  "Bayonetta 3[1.2.0]": "贝姐3"
+}
+```
+
+#### 模组名称映射
+
+**文件路径**：`SD卡/mods2/游戏文件夹的名字[模组版本标签]/游戏ID/mod_name.json`
+
+**格式**：
+```json
+{
+  "模组文件夹的名字": {
+    "display_name": "想要映射的名字",
+    "description": "模组描述"
+  }
+}
+```
+
+**示例**：
+```json
+{
+  "FPS-60[F]": {
+    "display_name": "稳定30FPS",
+    "description": "更细节的画面调整，帮助游戏稳定30FPS，提高游玩体验。"
+  },
+  "720&900[G]": {
+    "display_name": "更多分辨率",
+    "description": "将游戏分辨率调整为手持720p,底座900p，提高画面质量。"
+  }
+}
+```
+
+**注意**：编辑映射文件时，需注意花括号位置和JSON格式的正确性。
+
 
 
 
@@ -63,44 +173,21 @@ SSM2/
 └── README.md                     # 项目说明
 ```
 
-
-### 环境要求
-
-- **devkitPro**: Switch开发工具链
-- **libnx**: Switch系统库
-- **C++23编译器**: 支持现代C++特性
-
-### 依赖库
-
-项目使用以下第三方库：
-
-- **deko3d**: Switch GPU图形API
-- **switch-libpulsar**: 音频播放库
-- **libnxtc-add-version**: 标题缓存管理
-- **NanoVG**: 2D矢量图形库
-- **yyjson**: 高性能JSON解析库
-
 ### 构建步骤
 
-1. **设置环境变量**:
+1. **克隆项目**:
    ```bash
-   export DEVKITPRO=/opt/devkitpro
-   ```
-
-2. **克隆项目**:
-   ```bash
-   git clone <repository-url>
+   git clone <https://github.com/TOM-BadEN/NX-Mod-Manager.git>
    cd SSM2
    ```
 
-3. **编译项目**:
+2. **编译项目**:
    ```bash
    make
    ```
 
-4. **输出文件**:
+3. **输出文件**:
    - `NX-Mod-Manager.nro`: 可执行文件
-   - `NX-Mod-Manager.nacp`: 应用元数据
 
 
 ## 致谢
@@ -114,10 +201,10 @@ SSM2/
 
 ### 图形和音频
 - **[NanoVG](https://github.com/memononen/nanovg)** - 轻量级2D矢量图形库
-- **[switch-libpulsar](https://github.com/Maschell/switch-libpulsar)** - Switch音频播放库
+- **[switch-libpulsar](https://github.com/p-sam/switch-libpulsar)** - Switch音频播放库
 - **[fontstash](https://github.com/memononen/fontstash)** - 字体渲染库
 
 ### 工具库
 - **[yyjson](https://github.com/ibireme/yyjson)** - 高性能JSON解析库
-- **[libnxtc-add-version](https://github.com/DarkMatterCore/libnxtc-add-version)** - 标题缓存管理库
+- **[libnxtc](https://github.com/DarkMatterCore/libnxtc)** - 标题缓存管理库（本项目使用的是添加了version成员的libnxtc-add-version）
 - **[stb](https://github.com/nothings/stb)** - 图像处理库
