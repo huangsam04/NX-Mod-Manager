@@ -1,10 +1,13 @@
 # NX Mod Manager
 
 一个专为Nintendo Switch设计的模组管理器，支持多语言界面，音效反馈，名称映射，提供直观的模组安装、卸载和管理功能。
-MOD采用复制安装，针对大体型的MOD安装速度较慢，但是考虑到方便备份MODS2文件夹，所以采用复制安装的方式。
-
 A mod manager designed specifically for Nintendo Switch, supporting multi-language interface, audio feedback, name mapping, and providing intuitive mod installation, uninstallation, and management functions.
+
+MOD采用复制安装，针对大体型的MOD安装速度较慢，但是考虑到方便备份MODS2文件夹，所以采用复制安装的方式。
 MODs are installed using copy method. For large MODs, the installation speed is slower, but considering the convenience of backing up the MODS2 folder, the copy installation method is adopted.
+
+插件支持本地缓存数据，20+系统除了首次扫描较慢，二次进入都可极速加载。
+The plugin supports local data caching, and for 20+ systems, except for the slower initial scan, subsequent entries can load extremely fast.
 
 ## 界面展示 | Interface Screenshots
 
