@@ -1,115 +1,123 @@
-# Nintendo Switch Mod Manager (NX-Mod-Manager)
+# NX Mod Manager
 
-一个功能强大的Nintendo Switch模组管理工具，专为Nintendo Switch自制软件应用程序设计。
+一个专为Nintendo Switch设计的模组管理器，支持多语言界面和音效反馈，提供直观的模组安装、卸载和管理功能。
 
-## 项目概述
 
-Nintendo Switch Mod Manager是一个专业的模组管理应用程序，运行在Nintendo Switch主机上，为用户提供直观、高效的模组安装、管理和卸载功能。该项目采用现代C++开发，充分利用了Nintendo Switch的硬件特性，提供流畅的用户体验。
 
-## 主要特性
+## 使用方法
 
-### 🎮 模组管理功能
-- **多类型模组支持**：支持Cheat Code、FPS优化、HD材质、美化、游戏性增强等多种模组类型
-- **智能安装系统**：自动识别模组结构，支持exefs_patches和contents文件夹的同时安装
-- **版本兼容性检查**：自动验证模组与游戏版本的兼容性
-- **批量操作**：支持多个模组的批量安装和卸载
-- **安全卸载**：完整清理模组文件，避免残留
 
-### 🌐 多语言支持
-- 内置多语言系统，支持中文、英文等多种语言
-- 动态语言切换，无需重启应用
-- 完整的本地化支持，包括UI文本和帮助信息
 
-### 🎵 音效系统
-- 集成音效管理器，提供丰富的交互反馈
-- 支持系统音效和自定义音效
-- 异步音频处理，不影响主界面流畅性
+### 模组安装流程
 
-### ⚡ 性能优化
-- 异步任务处理框架，避免界面卡顿
-- GPU加速渲染，利用deko3d图形API
-- 内存优化管理，适配Switch有限的内存资源
-- 智能缓存机制，提升响应速度
+1. **扫描检测**: 程序自动扫描SD卡中的模组
+2. **版本检查**: 验证模组与游戏版本的兼容性
+3. **类型识别**: 根据标签自动识别模组类型
+4. **安装确认**: 显示安装进度和结果
+5. **状态更新**: 实时更新
+
+### 模组目录结构
+
+```
+SD卡/mods2/
+└── 游戏名[版本]/
+    └── 游戏ID/
+        └── 模组名[类型]/
+            ├── contents/           # LayeredFS模组
+            └── exefs_patches/      # 代码补丁模组
+```
+
+### 版本兼容性检查
+
+程序会自动检查模组版本与游戏版本的兼容性：
+- ✅ **版本可用**: 模组版本与游戏版本匹配
+- ❌ **版本不可用**: 版本不匹配，可能导致问题
+- ❓ **版本未知**: 无法确定版本信息
+
+
 
 ## 项目结构
 
 ```
-NX-Mod-Manager/
-├── src/                    # 源代码目录
-│   ├── app.cpp            # 应用程序主逻辑
-│   ├── app.hpp            # 应用程序头文件
-│   ├── main.cpp           # 程序入口点
-│   ├── async.hpp          # 异步处理框架
-│   ├── audio_manager.*    # 音效管理器
-│   ├── lang_manager.*     # 多语言管理器
-│   ├── nvg_util.*         # NanoVG图形工具
-│   ├── utils/             # 工具类
-│   │   └── logger.*       # 日志系统
-│   ├── nanovg/            # NanoVG图形库
-│   └── yyjson/            # JSON解析库
-├── assets/                # 资源文件
-│   ├── icon.jpg          # 应用图标
-│   └── romfs/            # RomFS资源
-│       ├── *.jpg         # 模组类型图标
-│       ├── lang/         # 语言文件
-│       └── shaders/      # 着色器文件
-├── lib/                  # 第三方库
-│   ├── libnxtc-add-version/  # 版本管理库
-│   └── switch-libpulsar/     # Pulsar库
-├── Makefile             # 构建配置
-├── README.md           # 项目说明
-└── LICENSE             # 许可证
+SSM2/
+├── src/                          # 源代码目录
+│   ├── app.cpp/hpp               # 主应用程序类
+│   ├── main.cpp                  # 程序入口点
+│   ├── audio_manager.cpp/hpp     # 音效管理器
+│   ├── lang_manager.cpp/hpp      # 多语言管理器
+│   ├── async.hpp                 # 异步处理工具
+│   ├── nanovg/                   # NanoVG图形库
+│   ├── yyjson/                   # JSON解析库
+│   └── utils/                    # 工具类
+│       └── logger.cpp/hpp        # 日志系统
+├── assets/                       # 资源文件
+│   ├── icon.jpg                  # 应用图标
+│   └── romfs/                    # RomFS资源
+│       ├── lang/                 # 多语言文件
+│       ├── *.jpg                 # 模组类型图标
+│       └── shaders/              # 着色器文件
+├── lib/                          # 第三方库
+│   ├── switch-libpulsar/         # 音频库
+│   └── libnxtc-add-version/      # 标题缓存库
+├── Makefile                      # 构建配置
+└── README.md                     # 项目说明
 ```
 
-## 构建说明
 
 ### 环境要求
-- **devkitPro**：Nintendo Switch开发工具链
-- **libnx**：Nintendo Switch系统库
-- **deko3d**：图形渲染库
-- **C++17**：现代C++标准支持
+
+- **devkitPro**: Switch开发工具链
+- **libnx**: Switch系统库
+- **C++23编译器**: 支持现代C++特性
+
+### 依赖库
+
+项目使用以下第三方库：
+
+- **deko3d**: Switch GPU图形API
+- **switch-libpulsar**: 音频播放库
+- **libnxtc-add-version**: 标题缓存管理
+- **NanoVG**: 2D矢量图形库
+- **yyjson**: 高性能JSON解析库
 
 ### 构建步骤
-```bash
-# 1. 确保devkitPro环境已正确配置
-export DEVKITPRO=/opt/devkitpro
-export DEVKITARM=${DEVKITPRO}/devkitARM
-export DEVKITPPC=${DEVKITPRO}/devkitPPC
 
-# 2. 克隆项目
-git clone https://github.com/TOM-BadEN/NX-Mod-Manager.git
-cd NX-Mod-Manager
+1. **设置环境变量**:
+   ```bash
+   export DEVKITPRO=/opt/devkitpro
+   ```
 
-# 3. 编译项目
-make
+2. **克隆项目**:
+   ```bash
+   git clone <repository-url>
+   cd SSM2
+   ```
 
-# 4. 清理构建文件（可选）
-make clean
-```
+3. **编译项目**:
+   ```bash
+   make
+   ```
 
-## 使用方法
+4. **输出文件**:
+   - `NX-Mod-Manager.nro`: 可执行文件
+   - `NX-Mod-Manager.nacp`: 应用元数据
 
-### 安装
-1. 将编译生成的`.nro`文件复制到Switch的`/switch/`目录
-2. 通过Homebrew Launcher启动应用程序
 
-### 操作说明
-- **A键**：确认选择/进入
-- **B键**：返回/取消
-- **十字键/左摇杆**：导航选择
-- **R键/右摇杆**：翻页（下一页）
-- **L键**：翻页（上一页）
-- **+键**：显示帮助信息
-- **-键**：退出应用程序
+## 致谢
 
-## 许可证
+感谢以下开源项目和库的贡献：
 
-本项目采用MIT许可证，详情请参阅[LICENSE](LICENSE)文件。
+### 核心依赖
+- **[devkitPro](https://devkitpro.org/)** - Nintendo Switch开发工具链
+- **[libnx](https://github.com/switchbrew/libnx)** - Switch系统库，提供底层API支持
+- **[deko3d](https://github.com/devkitPro/deko3d)** - Switch GPU图形API，实现高性能渲染
 
-## 免责声明
+### 图形和音频
+- **[NanoVG](https://github.com/memononen/nanovg)** - 轻量级2D矢量图形库
+- **[switch-libpulsar](https://github.com/Maschell/switch-libpulsar)** - Switch音频播放库
+- **[fontstash](https://github.com/memononen/fontstash)** - 字体渲染库
 
-本软件仅供学习和研究目的使用。使用本软件修改游戏可能违反游戏的使用条款，请用户自行承担相关风险和责任。开发者不对因使用本软件而导致的任何损失或法律问题承担责任。
-
----
-
-**注意**：本项目是一个自制软件，需要在已破解的Nintendo Switch上运行。请确保您了解相关的法律风险，并仅在合法的范围内使用。
+### 工具库
+- **[yyjson](https://github.com/ibireme/yyjson)** - 高性能JSON解析库
+- **[libnxtc-add-version](https://github.com/DarkMatterCore/libnxtc-add-version)** - 标题缓存管理库
+- **[stb](https://github.com/nothings/stb)** - 图像处理库
