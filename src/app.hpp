@@ -4,6 +4,7 @@
 #include "nanovg/deko3d/dk_renderer.hpp"
 #include "async.hpp"
 #include "audio_manager.hpp"
+#include "mod_manager.hpp"
 #include "yyjson/yyjson.h"
 
 #include <switch.h>
@@ -19,6 +20,7 @@
 #include <queue>
 #include <chrono>
 #include <unordered_map>
+#include <unordered_set>
 
 namespace tj {
 
@@ -41,13 +43,19 @@ enum class DialogType {
 
 // 复制进度信息结构体 (Copy progress info structure)
 struct CopyProgressInfo {
-    std::string current_file{"正在统计文件数量..."};      // 当前正在复制的文件名 (Current file being copied)
+    std::string current_file{""};      // 当前正在复制的文件名 (Current file being copied)
     size_t files_copied{0};           // 已复制的文件数量 (Number of files copied)
     size_t total_files{0};            // 需要复制的文件总数 (Total number of files to copy)
     float progress_percentage{0.0f};     // 进度百分比 (Progress percentage)
     bool is_completed{false};             // 是否完成 (Whether completed)
     bool has_error{false};                // 是否有错误 (Whether has error)
     std::string error_message;     // 错误信息 (Error message)
+    
+    // 文件级进度相关字段 (File-level progress related fields)
+    float file_progress_percentage{0.0f}; // 当前文件的复制进度百分比 (Current file copy progress percentage)
+    size_t file_bytes_copied{0};          // 当前文件已复制的字节数 (Bytes copied for current file)
+    size_t file_total_bytes{0};           // 当前文件的总字节数 (Total bytes for current file)
+    bool is_copying_file{false};          // 是否正在复制文件（用于区分删除操作）(Whether copying file - to distinguish from delete operations)
 };
 
 struct Controller final {
@@ -279,8 +287,11 @@ private:
     float FPS{0.0f}; // 当前帧率 (Current frame rate)
     
     AudioManager audio_manager; // 音效管理器 (Audio manager)
+    
+    // 操作计时相关 (Operation timing related)
+    std::chrono::milliseconds operation_duration{0}; // 操作耗时 (Operation duration)
 
-    // 教程界面翻页变量 (Instruction interface pagination variable)
+    // 教程界面相关 (Instruction interface related)
     int instruction_current_page{0};  // 当前页码 (Current page number)
 
     // 模组名称映射相关 (MOD name mapping related)
@@ -289,6 +300,11 @@ private:
     
     // 游戏名称映射相关 (Game name mapping related)
     std::unordered_map<std::string, ModNameInfo> game_name_cache; // 缓存已加载的游戏名称映射数据 (Cache for loaded game name mapping data)
+    
+    // MOD管理器相关 (MOD manager related)
+    ModManager mod_manager; // MOD压缩解压管理器 (MOD compression/decompression manager)
+    util::AsyncFurture<bool> mod_install_task; // 异步MOD安装任务 (Async MOD installation task)
+    bool mod_install_in_progress{false}; // MOD安装是否正在进行 (Whether MOD installation is in progress)
     
     void Draw();
     void Update();
@@ -340,8 +356,12 @@ private:
     std::string GetMappedGameName(const std::string& original_name, const std::string& mod_version); // 获取映射后的游戏名称 (Get mapped game name)
     void ClearGameNameCache(); // 清空游戏名称映射缓存 (Clear game name mapping cache)
 
-    // 字符串格式化辅助函数 (String formatting helper function)
-    std::string GetSnprintf(const std::string& format_str, const std::string& value); // 格式化字符串，将%s替换为指定值 (Format string, replace %s with specified value)
+    // 字符串格式化辅助函数声明 (String formatting helper function declarations)
+    std::string GetSnprintf(const std::string& format_str, const std::string& value);
+    std::string GetSnprintf(const std::string& format_str, const std::string& value1, const std::string& value2);
+    
+    // 格式化时间显示函数
+    std::string FormatDuration(double seconds);
 
     // MOD相关函数 (MOD related functions)
     void FastScanModInfo(); // 快速扫描MOD信息 (Fast scan MOD info)
@@ -349,22 +369,13 @@ private:
     void ChangeModName(); // 切换当前选中模组的安装状态并修改名称 (Toggle current selected mod install status and modify name)
     int ModInstalled(); // 安装选中的MOD到atmosphere目录 (Install selected MOD to atmosphere directory)
     int ModUninstalled(); // 卸载选中的MOD从atmosphere目录 (Uninstall selected MOD from atmosphere directory)
-
-    bool CopyFile(const std::string& source_path, const std::string& dest_path); // 复制单个文件 (Copy single file)
     
-    // 异步复制相关函数 (Async copy related functions)
-    bool CopyDirectoryRecursiveAsync(std::stop_token stop_token, const std::string& source_path, const std::string& dest_path, 
-                                     std::function<void(const CopyProgressInfo&)> progress_callback); // 异步递归复制目录 (Async recursively copy directory)
-    size_t CountFilesInDirectory(const std::string& path); // 统计目录中的文件数量 (Count files in directory)
     
-    // 删除目录相关函数 (Directory deletion related functions)
-    
-    // 选择性删除相关函数 (Selective deletion related functions)
-    bool RemoveModFilesSelectively(std::stop_token stop_token, const std::string& mod_source_path, const std::string& target_path,
-                                   std::function<void(const CopyProgressInfo&)> progress_callback); // 选择性删除MOD文件 (Selectively remove MOD files)
-    size_t CountModFilesToRemove(const std::string& mod_source_path, const std::string& target_path); // 统计需要删除的MOD文件数量 (Count MOD files to remove)
 
 
+   
+    
+    
 
 
 private: // from nanovg decko3d example by adubbz

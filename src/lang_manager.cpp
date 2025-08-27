@@ -87,6 +87,13 @@ std::string COPY_ERROR;
 std::string UNINSTALLED_ERROR;
 std::string CLEAR_BUTTON;
 std::string FILE_NONE;
+std::string DNOT_READY;
+
+std::string ZIP_OPEN_ERROR;
+std::string ZIP_READ_ERROR;
+std::string CANT_READ_ERROR;
+std::string CANT_CREATE_ERROR;
+std::string CANT_WRITE_ERROR;
 
 namespace tj {
 
@@ -341,6 +348,13 @@ bool LangManager::loadLanguage(const std::string& langCode) {
             {"UNINSTALLED_ERROR", std::ref(UNINSTALLED_ERROR)},
             {"CLEAR_BUTTON", std::ref(CLEAR_BUTTON)},
             {"FILE_NONE", std::ref(FILE_NONE)},
+            {"DNOT_READY", std::ref(DNOT_READY)},
+
+            {"ZIP_OPEN_ERROR", std::ref(ZIP_OPEN_ERROR)},
+            {"ZIP_READ_ERROR", std::ref(ZIP_READ_ERROR)},
+            {"CANT_READ_ERROR", std::ref(CANT_READ_ERROR)},
+            {"CANT_CREATE_ERROR", std::ref(CANT_CREATE_ERROR)},
+            {"CANT_WRITE_ERROR", std::ref(CANT_WRITE_ERROR)},
         };
 
         // 遍历映射表进行赋值 - 修改为更兼容的遍历方式

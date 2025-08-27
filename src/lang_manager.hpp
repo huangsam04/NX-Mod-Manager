@@ -88,6 +88,13 @@ extern std::string COPY_ERROR;
 extern std::string UNINSTALLED_ERROR;
 extern std::string CLEAR_BUTTON;
 extern std::string FILE_NONE;
+extern std::string DNOT_READY;
+
+extern std::string ZIP_OPEN_ERROR;
+extern std::string ZIP_READ_ERROR;
+extern std::string CANT_READ_ERROR;
+extern std::string CANT_CREATE_ERROR;
+extern std::string CANT_WRITE_ERROR;
 
 namespace tj {
 

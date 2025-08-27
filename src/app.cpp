@@ -10,6 +10,7 @@
 #include "lang_manager.hpp"
 // 时间计算 (Time calculation)
 #include <chrono>
+
 // 原子操作 (Atomic operations)
 #include <atomic>
 // 智能指针 (Smart pointers)
@@ -33,6 +34,8 @@
 #include <switch.h>
 // 文件状态 (File status)
 #include <sys/stat.h>
+// 错误码定义 (Error code definitions)
+#include <errno.h>
 
 
 // 调试模式日志宏定义 (Debug mode log macro definition)
@@ -125,29 +128,53 @@ void update_pulse_colour() { //更新脉冲颜色函数(Update pulse color funct
 
 } // namespace
 
-// 格式化存储大小的辅助函数 (Helper function to format storage size)
-// 将字节数转换为可读的存储大小字符串 (Convert bytes to readable storage size string)
-std::string FormatStorageSize(std::size_t size_bytes) {
-    if (size_bytes == 0) { // 如果大小为0则返回空字符串 (Return empty string if size is 0)
-        return "";
+// 字符串格式化辅助函数实现 (String formatting helper function implementations)
+std::string App::GetSnprintf(const std::string& format_str, const std::string& value) {
+    // 计算所需缓冲区大小 (Calculate required buffer size)
+    int size = std::snprintf(nullptr, 0, format_str.c_str(), value.c_str());
+    if (size <= 0) return format_str; // 格式化失败，返回原字符串 (Format failed, return original string)
+    
+    // 分配缓冲区并格式化 (Allocate buffer and format)
+    std::vector<char> buffer(size + 1);
+    std::snprintf(buffer.data(), buffer.size(), format_str.c_str(), value.c_str());
+    return std::string(buffer.data());
+}
+
+std::string App::GetSnprintf(const std::string& format_str, const std::string& value1, const std::string& value2) {
+    // 计算所需缓冲区大小 (Calculate required buffer size)
+    int size = std::snprintf(nullptr, 0, format_str.c_str(), value1.c_str(), value2.c_str());
+    if (size <= 0) return format_str; // 格式化失败，返回原字符串 (Format failed, return original string)
+    
+    // 分配缓冲区并格式化 (Allocate buffer and format)
+    std::vector<char> buffer(size + 1);
+    std::snprintf(buffer.data(), buffer.size(), format_str.c_str(), value1.c_str(), value2.c_str());
+    return std::string(buffer.data());
+}
+
+// 格式化时间显示函数 (Format duration display function)
+std::string App::FormatDuration(double seconds) {
+    // 如果小于1秒，
+    if (seconds < 1.0) {
+        return "0.1s";
     }
     
-    // 计算GB值 (Calculate GB value)
-    float size_in_gb = static_cast<float>(size_bytes) / 0x40000000; // 1GB = 1024^3 bytes
+    int total_seconds = static_cast<int>(seconds);
+    int hours = total_seconds / 3600;           // 计算小时数 (Calculate hours)
+    int minutes = (total_seconds % 3600) / 60;  // 计算分钟数 (Calculate minutes)
+    int secs = total_seconds % 60;              // 计算秒数 (Calculate seconds)
     
-    if (size_in_gb >= 1.0f) { // 如果大于等于1GB则显示GB单位 (Display GB unit if >= 1GB)
-        // 显示GB单位，保留一位小数 (Display GB unit with one decimal place)
-        char buffer[32]; // 缓冲区用于格式化字符串 (Buffer for formatted string)
-        snprintf(buffer, sizeof(buffer), "%.1f GB", size_in_gb); // 格式化为GB字符串 (Format as GB string)
-        return std::string(buffer); // 返回格式化后的字符串 (Return formatted string)
+    if (hours > 0) {
+        // xx时xx分xx秒 (xx hours xx minutes xx seconds)
+        return std::to_string(hours) + "h" + std::to_string(minutes) + "m" + std::to_string(secs) + "s";
+    } else if (minutes > 0) {
+        // xx分xx秒 (xx minutes xx seconds)
+        return std::to_string(minutes) + "m" + std::to_string(secs) + "s";
     } else {
-        // 显示MB单位，保留一位小数 (Display MB unit with one decimal place)
-        float size_in_mb = static_cast<float>(size_bytes) / 0x100000; // 1MB = 1024^2 bytes
-        char buffer[32]; // 缓冲区用于格式化字符串 (Buffer for formatted string)
-        snprintf(buffer, sizeof(buffer), "%.1f MB", size_in_mb); // 格式化为MB字符串 (Format as MB string)
-        return std::string(buffer); // 返回格式化后的字符串 (Return formatted string)
+        // xx秒 (xx seconds)
+        return std::to_string(secs) + "s";
     }
 }
+
 
 // ResourceLoadManager 实现 (ResourceLoadManager implementation)
 // 资源加载管理器的具体实现 (Concrete implementation of resource load manager)
@@ -670,7 +697,7 @@ void App::DrawList() {
     }
 
     
-    gfx::drawTextArgs(this->vg, 55.f, 670.f, 24.f, NVG_ALIGN_LEFT | NVG_ALIGN_TOP, gfx::Colour::WHITE, TOTAL_COUNT.c_str(), this->entries.size());
+    gfx::drawTextArgs(this->vg, 55.f, 670.f, 24.f, NVG_ALIGN_LEFT | NVG_ALIGN_TOP, gfx::Colour::WHITE, "%zu / %zu", this->index + 1, this->entries.size());
 
     // 恢复NanoVG绘图状态 / Restore NanoVG drawing state
     nvgRestore(this->vg);
@@ -1017,7 +1044,7 @@ void App::DrawModList() {
 
 
     // 绘制左下角mod数量 (Draw mod count in bottom-left corner)
-    gfx::drawTextArgs(this->vg, 55.f, 670.f, 24.f, NVG_ALIGN_LEFT | NVG_ALIGN_TOP, gfx::Colour::WHITE, TOTAL_COUNT.c_str(), mod_info.size());
+    gfx::drawTextArgs(this->vg, 55.f, 670.f, 24.f, NVG_ALIGN_LEFT | NVG_ALIGN_TOP, gfx::Colour::WHITE, "%zu / %zu", this->mod_index + 1, mod_info.size());
 
     // 恢复NanoVG绘图状态 / Restore NanoVG drawing state
     nvgRestore(this->vg);
@@ -1231,7 +1258,7 @@ void App::UpdateList() {
         
         this->ShowDialog(DialogType::INFO,
              "作者：TOM\n版本：1.0.0\nQ群：1051287661\n乡村大舞台，折腾你就来！",
-              24.0f,NVG_ALIGN_LEFT|NVG_ALIGN_MIDDLE);
+              26.0f,NVG_ALIGN_LEFT|NVG_ALIGN_MIDDLE);
 
         this->audio_manager.PlayConfirmSound(); // 播放确认音效 (Play confirm sound effect)
         
@@ -1400,7 +1427,8 @@ void App::UpdateModList() {
         this->audio_manager.PlayConfirmSound();
 
     } else if (this->controller.X) { // X键清理缓存 (X key to clear cache)
-
+        
+        this->audio_manager.PlayConfirmSound();
         this->clean_button = true;
         this->ShowDialog(DialogType::CONFIRM,GetSnprintf(CONFIRM_UNINSTALLED,select_mod_name),26.0f,NVG_ALIGN_CENTER|NVG_ALIGN_MIDDLE);
 
@@ -2137,7 +2165,6 @@ void App::LoadVisibleAreaIcons() {
 
 
 App::App() {
-
     // 使用封装后的方法自动加载系统语言
     // Automatically load the system language using lang_manager
     tj::LangManager::getInstance().loadSystemLanguage();
@@ -2178,6 +2205,10 @@ App::App() {
         this->dynamic_cmdbufs[i] = dk::CmdBufMaker{this->device}.create();
         const CMemPool::Handle dynamic_cmdmem = this->pool_data->allocate(this->StaticCmdSize);
         this->dynamic_cmdbufs[i].addMemory(dynamic_cmdmem.getMemBlock(), dynamic_cmdmem.getOffset(), dynamic_cmdmem.getSize());
+        
+        // 初始化动态命令列表
+        // Initialize dynamic command lists
+        this->dynamic_cmdlists[i] = this->dynamic_cmdbufs[i].finishList();
         
         // 初始化同步对象
         // Initialize synchronization objects
@@ -2452,20 +2483,9 @@ void App::ClearGameNameCache() {
     game_name_cache.clear();
 }
 
-// 字符串格式化辅助函数 (String formatting helper function)
-std::string App::GetSnprintf(const std::string& format_str, const std::string& value) {
-    // 计算所需缓冲区大小 (Calculate required buffer size)
-    int size = snprintf(nullptr, 0, format_str.c_str(), value.c_str());
-    if (size <= 0) {
-        return format_str; // 如果格式化失败，返回原字符串 (Return original string if formatting fails)
-    }
-    
-    // 分配缓冲区并格式化字符串 (Allocate buffer and format string)
-    std::string result(size, '\0');
-    snprintf(&result[0], size + 1, format_str.c_str(), value.c_str());
-    
-    return result;
-}
+
+
+
 
 /**
  * @brief App类的析构函数
@@ -2641,21 +2661,23 @@ void App::prepareNextCommandBuffer() {
     // 切换到下一个命令缓冲区
     // Switch to next command buffer
     this->current_cmdbuf_index = (this->current_cmdbuf_index + 1) % NumCommandBuffers;
+    
+    // 重新初始化当前命令缓冲区的命令列表
+    // Re-initialize command list for current command buffer
+    this->dynamic_cmdlists[this->current_cmdbuf_index] = this->dynamic_cmdbufs[this->current_cmdbuf_index].finishList();
 }
 
 // GPU命令优化：提交当前命令缓冲区
 // GPU command optimization: Submit current command buffer
 void App::submitCurrentCommandBuffer() {
-    if (this->dynamic_cmdlists[this->current_cmdbuf_index]) {
-        // 设置同步点
-        // Set synchronization point
-        this->dynamic_cmdbufs[this->current_cmdbuf_index].signalFence(this->command_fences[this->current_cmdbuf_index]);
-        
-        // 提交命令列表
-        // Submit command list
-        this->queue.submitCommands(this->dynamic_cmdlists[this->current_cmdbuf_index]);
-        this->command_submitted[this->current_cmdbuf_index] = true;
-    }
+    // 设置同步点
+    // Set synchronization point
+    this->dynamic_cmdbufs[this->current_cmdbuf_index].signalFence(this->command_fences[this->current_cmdbuf_index]);
+    
+    // 提交命令列表
+    // Submit command list
+    this->queue.submitCommands(this->dynamic_cmdlists[this->current_cmdbuf_index]);
+    this->command_submitted[this->current_cmdbuf_index] = true;
 }
 
 // GPU命令优化：等待指定命令缓冲区完成
@@ -2698,7 +2720,6 @@ void App::ShowCopyProgressDialog(const std::string& title) {
 void App::UpdateCopyProgress(const CopyProgressInfo& progress) {
     std::lock_guard<std::mutex> lock(this->copy_progress_mutex);
     this->copy_progress = progress;
-
 }
 
 // 隐藏对话框 (Hide dialog)
@@ -2707,9 +2728,6 @@ void App::HideDialog() {
     this->dialog_type = DialogType::INFO;
     this->dialog_content.clear();
     
-    // 清理复制进度相关数据 (Clear copy progress related data)
-    std::lock_guard<std::mutex> lock(this->copy_progress_mutex);
-    this->copy_progress = CopyProgressInfo{};
 }
 
 // 绘制对话框 (Draw dialog)
@@ -2810,6 +2828,19 @@ void App::DrawDialog() {
         nvgFillColor(this->vg, nvgRGB(255, 255, 255));
         snprintf(progress_text, sizeof(progress_text), "%.1f%%", progress_info.progress_percentage);
         nvgText(this->vg, progress_bar_x + progress_bar_width / 2.0f, progress_bar_y + progress_bar_height / 2.0f, progress_text, nullptr);
+        
+        // 绘制文件级进度条 (Draw file-level progress bar)
+        if (progress_info.is_copying_file && progress_info.file_progress_percentage > 0.0f) {
+            const float file_progress_bar_y = progress_bar_y + progress_bar_height + 10.0f; // 位于总进度条下方10像素 (10 pixels below total progress bar)
+            const float file_progress_bar_height = 3.0f; // 宽度3像素 (3 pixels width)
+            const float file_fill_width = progress_bar_width * (progress_info.file_progress_percentage / 100.0f);
+            
+            // 绘制文件级进度条填充 (Draw file-level progress bar fill)
+            nvgBeginPath(this->vg);
+            nvgRect(this->vg, progress_bar_x, file_progress_bar_y, file_fill_width, file_progress_bar_height);
+            nvgFillColor(this->vg, nvgRGB(0, 150, 255)); // 绿色进度条 (Green progress bar)
+            nvgFill(this->vg);
+        }
         
         return; // 复制进度对话框不绘制按钮 (Copy progress dialog doesn't draw buttons)
     }
@@ -2921,19 +2952,28 @@ void App::UpdateDialog() {
         bool MOD_STATE = this->mod_info[this->mod_index].MOD_STATE;
         
         // 检查复制任务是否完成 (Check if copy task is completed)
+        bool task_completed = false;
+        bool task_result = false;
+        
         if (copy_task.valid() && copy_task.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
-            bool copy_result = copy_task.get();
-            
-            // 复制完成后隐藏对话框 (Hide dialog after copy completion)
+            task_result = copy_task.get();
+            task_completed = true;
+        }
+        
+        
+        if (task_completed) {
+            // 任务完成后隐藏对话框 (Hide dialog after task completion)
             this->HideDialog();
             
             // 显示结果对话框 (Show result dialog)
-            if (copy_result) {
+            if (task_result) {
+                
                 this->audio_manager.PlayConfirmSound();
 
-                if (MOD_STATE || clean_button) {
-                    this->ShowDialog(DialogType::INFO, GetSnprintf(SUCCESS_UNINSTALLED,MOD_NAME), 24.0f, NVG_ALIGN_CENTER);
-                } else this->ShowDialog(DialogType::INFO, GetSnprintf(SUCCESS_INSTALLED,MOD_NAME), 24.0f, NVG_ALIGN_CENTER);
+                std::string duration_str = FormatDuration(this->operation_duration.count() / 1000);
+                
+                if (MOD_STATE || clean_button) this->ShowDialog(DialogType::INFO, GetSnprintf(SUCCESS_UNINSTALLED, MOD_NAME, duration_str), 26.0f, NVG_ALIGN_CENTER);
+                        else this->ShowDialog(DialogType::INFO, GetSnprintf(SUCCESS_INSTALLED, MOD_NAME, duration_str), 26.0f, NVG_ALIGN_CENTER);
                 
                 if (MOD_STATE && clean_button) {
                     this->ChangeModName();
@@ -2954,12 +2994,14 @@ void App::UpdateDialog() {
                 
                 {
                     std::lock_guard<std::mutex> lock(this->copy_progress_mutex);
-                    if (this->copy_progress.has_error && !this->copy_progress.error_message.empty()) {
+                    // 如果有具体的错误信息，优先显示具体错误信息 (If there's specific error message, prioritize showing it)
+                    if (!this->copy_progress.error_message.empty()) {
                         error_msg = this->copy_progress.error_message;
-                    }
+                    } 
                 }
+
                 this->audio_manager.PlayCancelSound();
-                this->ShowDialog(DialogType::INFO, error_msg, 24.0f, NVG_ALIGN_CENTER);
+                this->ShowDialog(DialogType::INFO, error_msg, 26.0f, NVG_ALIGN_CENTER);
             }
             return;
         }
@@ -2973,9 +3015,9 @@ void App::UpdateDialog() {
             this->HideDialog();
             this->audio_manager.PlayCancelSound();
             if (MOD_STATE && !clean_button) {
-                this->ShowDialog(DialogType::INFO, GetSnprintf(CANCEL_UNINSTALLED,MOD_NAME), 24.0f, NVG_ALIGN_CENTER);
+                this->ShowDialog(DialogType::INFO, GetSnprintf(CANCEL_UNINSTALLED,MOD_NAME), 26.0f, NVG_ALIGN_CENTER);
                 this->clean_button = false;
-            } else this->ShowDialog(DialogType::INFO, GetSnprintf(CANCEL_INSTALLED,MOD_NAME), 24.0f, NVG_ALIGN_CENTER);
+            } else this->ShowDialog(DialogType::INFO, GetSnprintf(CANCEL_INSTALLED,MOD_NAME), 26.0f, NVG_ALIGN_CENTER);
             return;
         }
     }
@@ -3001,8 +3043,9 @@ void App::UpdateDialog() {
 
             bool select_mod_state = this->mod_info[this->mod_index].MOD_STATE;
             int result = 0;
+            
             if (select_mod_state || clean_button) {
-                result = ModUninstalled();
+                result = ModUninstalled(); // 卸载仍使用原方法 (Uninstall still uses original method)
             } else {
                 result = ModInstalled();
             }
@@ -3201,277 +3244,20 @@ void App::Sort_Mod() {
 }
 
 
-
-// 复制单个文件函数 (Copy single file function)
-bool App::CopyFile(const std::string& source_path, const std::string& dest_path) {
-    // 打开源文件 (Open source file)
-    FILE* source_file = fopen(source_path.c_str(), "rb");
-    if (!source_file) {
-        return false; // 无法打开源文件 (Cannot open source file)
-    }
-    
-    // 创建目标文件 (Create destination file)
-    FILE* dest_file = fopen(dest_path.c_str(), "wb");
-    if (!dest_file) {
-        fclose(source_file);
-        return false; // 无法创建目标文件 (Cannot create destination file)
-    }
-    
-    // 复制文件内容 (Copy file content)
-    const size_t buffer_size = 256 * 1024; // 256KB缓冲区 (256KB buffer)
-    char* buffer = new char[buffer_size];
-    size_t bytes_read;
-    bool success = true;
-    
-    while ((bytes_read = fread(buffer, 1, buffer_size, source_file)) > 0) {
-        if (fwrite(buffer, 1, bytes_read, dest_file) != bytes_read) {
-            success = false;
-            break; // 写入失败 (Write failed)
-        }
-    }
-    
-    // 清理资源 (Clean up resources)
-    delete[] buffer;
-    fclose(source_file);
-    fclose(dest_file);
-    
-    return success;
-}
-
-// 统计目录中的文件数量 (Count files in directory)
-size_t App::CountFilesInDirectory(const std::string& path) {
-    DIR* dir = opendir(path.c_str());
-    if (!dir) {
-        return 0;
-    }
-    
-    size_t count = 0;
-    struct dirent* entry;
-    
-    while ((entry = readdir(dir)) != nullptr) {
-        if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0) {
-            continue;
-        }
-        
-        std::string full_path = path + "/" + entry->d_name;
-        struct stat item_stat;
-        if (stat(full_path.c_str(), &item_stat) == 0) {
-            if (S_ISDIR(item_stat.st_mode)) {
-                count += CountFilesInDirectory(full_path); // 递归统计子目录 (Recursively count subdirectories)
-            } else if (S_ISREG(item_stat.st_mode)) {
-                count++; // 统计文件 (Count files)
-            }
-        }
-    }
-    
-    closedir(dir);
-    return count;
-}
-
-// 统计需要删除的MOD文件数量 (Count MOD files to remove)
-size_t App::CountModFilesToRemove(const std::string& mod_source_path, const std::string& target_path) {
-    size_t count = 0;
-    
-    DIR* source_dir = opendir(mod_source_path.c_str());
-    if (!source_dir) {
-        return 0;
-    }
-    
-    struct dirent* entry;
-    while ((entry = readdir(source_dir)) != nullptr) {
-        if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0) {
-            continue;
-        }
-        
-        std::string source_item = mod_source_path + "/" + entry->d_name;
-        std::string target_item = target_path + "/" + entry->d_name;
-        
-        struct stat source_stat;
-        if (stat(source_item.c_str(), &source_stat) == 0) {
-            if (S_ISDIR(source_stat.st_mode)) {
-                // 递归统计子目录中的文件 (Recursively count files in subdirectory)
-                count += CountModFilesToRemove(source_item, target_item);
-            } else if (S_ISREG(source_stat.st_mode)) {
-                // 检查目标文件是否存在 (Check if target file exists)
-                struct stat target_stat;
-                if (stat(target_item.c_str(), &target_stat) == 0 && S_ISREG(target_stat.st_mode)) {
-                    count++; // 只统计存在的目标文件 (Only count existing target files)
-                }
-            }
-        }
-    }
-    
-    closedir(source_dir);
-    return count;
-}
-
-// 选择性删除MOD文件 (Selectively remove MOD files)
-bool App::RemoveModFilesSelectively(std::stop_token stop_token, const std::string& mod_source_path, const std::string& target_path,
-                                    std::function<void(const CopyProgressInfo&)> progress_callback) {
-    DIR* source_dir = opendir(mod_source_path.c_str());
-    if (!source_dir) {
-        return false;
-    }
-    
-    bool success = true;
-    struct dirent* entry;
-    
-    while ((entry = readdir(source_dir)) != nullptr && !stop_token.stop_requested()) {
-        if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0) {
-            continue;
-        }
-        
-        std::string source_item = mod_source_path + "/" + entry->d_name;
-        std::string target_item = target_path + "/" + entry->d_name;
-        
-        struct stat source_stat;
-        if (stat(source_item.c_str(), &source_stat) == 0) {
-            if (S_ISDIR(source_stat.st_mode)) {
-                // 递归删除子目录中的文件 (Recursively remove files in subdirectory)
-                struct stat target_stat;
-                if (stat(target_item.c_str(), &target_stat) == 0 && S_ISDIR(target_stat.st_mode)) {
-                    if (!RemoveModFilesSelectively(stop_token, source_item, target_item, progress_callback)) {
-                        success = false;
-                    }
-                    
-                    // 检查目标目录是否为空，如果为空则删除 (Check if target directory is empty, remove if empty)
-                    DIR* target_dir = opendir(target_item.c_str());
-                    if (target_dir) {
-                        bool is_empty = true;
-                        struct dirent* target_entry;
-                        while ((target_entry = readdir(target_dir)) != nullptr) {
-                            if (strcmp(target_entry->d_name, ".") != 0 && strcmp(target_entry->d_name, "..") != 0) {
-                                is_empty = false;
-                                break;
-                            }
-                        }
-                        closedir(target_dir);
-                        
-                        if (is_empty) {
-                            if (rmdir(target_item.c_str()) != 0) {
-                                success = false;
-                            }
-                        }
-                    }
-                }
-            } else if (S_ISREG(source_stat.st_mode)) {
-                // 删除对应的目标文件 (Remove corresponding target file)
-                struct stat target_stat;
-                if (stat(target_item.c_str(), &target_stat) == 0 && S_ISREG(target_stat.st_mode)) {
-                    // 更新进度信息 (Update progress info)
-                    CopyProgressInfo progress;
-                    {
-                        std::lock_guard<std::mutex> lock(this->copy_progress_mutex);
-                        this->copy_progress.files_copied++;
-                        // 提取文件名而不是完整路径 (Extract filename instead of full path)
-                        std::string filename = target_item.substr(target_item.find_last_of("/\\") + 1);
-                        this->copy_progress.current_file = filename;
-                        if (this->copy_progress.total_files > 0) {
-                            this->copy_progress.progress_percentage = 
-                                (float)this->copy_progress.files_copied / this->copy_progress.total_files * 100.0f;
-                        }
-                        progress = this->copy_progress;
-                    }
-                    progress_callback(progress);
-                    
-                    if (remove(target_item.c_str()) != 0) {
-                        success = false;
-                    }
-                }
-            }
-        }
-    }
-    
-    closedir(source_dir);
-    return success && !stop_token.stop_requested();
-}
-
-// 异步递归复制目录 (Async recursively copy directory)
-bool App::CopyDirectoryRecursiveAsync(std::stop_token stop_token, const std::string& source_path, const std::string& dest_path, 
-                                     std::function<void(const CopyProgressInfo&)> progress_callback) {
-    // 检查是否需要停止 (Check if need to stop)
-    if (stop_token.stop_requested()) {
-        return false;
-    }
-    
-    // 打开源目录 (Open source directory)
-    DIR* source_dir = opendir(source_path.c_str());
-    if (!source_dir) {
-        CopyProgressInfo error_progress;
-        error_progress.has_error = true;
-        error_progress.error_message = CANT_OPEN_FILE + source_path;
-        progress_callback(error_progress);
-        return false;
-    }
-    
-    // 创建目标目录 (Create destination directory)
-    if (mkdir(dest_path.c_str(), 0755) != 0) {
-        if (errno != EEXIST) {
-            closedir(source_dir);
-            CopyProgressInfo error_progress;
-            error_progress.has_error = true;
-            error_progress.error_message = CANT_CREATE_DIR + dest_path;
-            progress_callback(error_progress);
-            return false;
-        }
-    }
-    
-    struct dirent* entry;
-    bool success = true;
-    
-    // 遍历源目录中的所有条目 (Iterate through all entries in source directory)
-    while ((entry = readdir(source_dir)) != nullptr && success && !stop_token.stop_requested()) {
-        // 跳过当前目录和父目录 (Skip current and parent directory)
-        if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0) {
-            continue;
-        }
-        
-        // 构建完整路径 (Build full paths)
-        std::string source_item = source_path + "/" + entry->d_name;
-        std::string dest_item = dest_path + "/" + entry->d_name;
-        
-        // 获取文件状态 (Get file status)
-        struct stat item_stat;
-        if (stat(source_item.c_str(), &item_stat) != 0) {
-            success = false;
-            break;
-        }
-        
-        if (S_ISDIR(item_stat.st_mode)) {
-            // 递归复制子目录 (Recursively copy subdirectory)
-            success = CopyDirectoryRecursiveAsync(stop_token, source_item, dest_item, progress_callback);
-        } else if (S_ISREG(item_stat.st_mode)) {
-            // 更新当前复制的文件名 (Update current copying file name)
-            CopyProgressInfo current_progress;
-            {
-                std::lock_guard<std::mutex> lock(this->copy_progress_mutex);
-                current_progress = this->copy_progress;
-            }
-            current_progress.current_file = entry->d_name;
-            progress_callback(current_progress);
-            
-            // 复制文件 (Copy file)
-            success = CopyFile(source_item, dest_item);
-            
-            if (success) {
-                // 更新复制进度 (Update copy progress)
-                current_progress.files_copied++;
-
-                if (current_progress.total_files > 0) {
-                    current_progress.progress_percentage = 
-                        static_cast<float>(current_progress.files_copied) / current_progress.total_files * 100.0f;
-                }
-                progress_callback(current_progress);
-            }
-        }
-    }
-    
-    closedir(source_dir);
-    return success && !stop_token.stop_requested();
-}
-
-// 安装选中的MOD到atmosphere目录 (Install selected MOD to atmosphere directory)
 int App::ModInstalled() {
+    // 如果有正在运行的任务，检查是否已停止 (If there's a running task, check if it has stopped)
+    if (copy_task.valid()) {
+        auto status = copy_task.wait_for(std::chrono::milliseconds(0));
+        if (status == std::future_status::timeout) {
+            // 任务仍在运行，显示提示对话框 (Task still running, show prompt dialog)
+            this->audio_manager.PlayCancelSound();
+            this->ShowDialog(DialogType::INFO, DNOT_READY, 26.0f, NVG_ALIGN_CENTER);
+            return 0; // 返回0表示操作被阻止 (Return 0 to indicate operation blocked)
+        }
+        copy_task.request_stop(); // 请求停止当前任务 (Request to stop current task)
+    }
+    
+    
     // 检查是否有选中的MOD (Check if there is a selected MOD)
     if (this->mod_info.empty() || this->mod_index >= this->mod_info.size()) {
         return 0; // 没有选中的MOD (No selected MOD)
@@ -3480,141 +3266,103 @@ int App::ModInstalled() {
     // 获取当前选中MOD的路径 (Get current selected MOD path)
     std::string mod_path = this->mod_info[this->mod_index].MOD_PATH;
     
-    // 打开MOD目录 (Open MOD directory)
-    DIR* mod_dir = opendir(mod_path.c_str());
-    if (!mod_dir) {
-        return 0; // 无法打开MOD目录 (Cannot open MOD directory)
-    }
-    
-    std::vector<std::string> target_folders; // 目标文件夹列表 (Target folder list)
-    
-    struct dirent* entry;
-    // 遍历MOD目录下的所有条目 (Iterate through all entries in MOD directory)
-    while ((entry = readdir(mod_dir)) != nullptr) {
-        // 跳过当前目录和父目录 (Skip current and parent directory entries)
-        if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0) {
-            continue;
-        }
-        
-        // 构建完整路径检查是否为目录 (Build full path to check if it's a directory)
-        std::string full_path = mod_path + "/" + entry->d_name;
-        DIR* test_dir = opendir(full_path.c_str());
-        if (test_dir) {
-            closedir(test_dir);
-            
-            // 检查文件夹名称是否符合要求 (Check if folder name meets requirements)
-            std::string folder_name = entry->d_name;
-            if (folder_name == "exefs_patches" || folder_name == "contents") {
-                target_folders.push_back(folder_name);
-            } else {
-                // 文件夹名称不符合要求 (Folder name doesn't meet requirements)
-                closedir(mod_dir);
-                return 0;
-            }
-        }
-    }
-    
-    closedir(mod_dir);
-    
-    // 检查是否有有效的文件夹 (Check if there are valid folders)
-    if (target_folders.empty()) {
-
-        this->audio_manager.PlayCancelSound();
-        // 显示信息对话框，提示MOD结构无效 (Show info dialog for invalid MOD structure)
-        ShowDialog(DialogType::INFO, GetSnprintf(FILE_NONE, this->mod_info[this->mod_index].MOD_NAME2.c_str()),
-            26.0f,NVG_ALIGN_CENTER|NVG_ALIGN_MIDDLE);
-        return 0; // 没有有效的文件夹 (No valid folders)
-
-    }
-    
-    // 立即显示复制进度对话框 (Immediately show copy progress dialog)
+    // 立即显示安装进度对话框 (Immediately show installation progress dialog)
     ShowCopyProgressDialog(INSTALLEDING_TEXT);
     
-    // 初始化进度信息，总文件数将在异步任务中更新 (Initialize progress info, total files will be updated in async task)
+    // 初始化进度信息 (Initialize progress info)
     {
         std::lock_guard<std::mutex> lock(this->copy_progress_mutex);
-        this->copy_progress.current_file = CALCULATE_FILES; 
+        this->copy_progress = {};
     }
     
-    // 启动异步复制任务 (Start async copy task)
-    copy_task = util::async([this, mod_path, target_folders](std::stop_token stop_token) -> bool {
-        // 首先统计所有文件夹的文件数量 (First count files in all folders)
-        size_t total_files = 0;
-        for (const std::string& folder : target_folders) {
-            std::string source_path = mod_path + "/" + folder;
-            total_files += CountFilesInDirectory(source_path);
-        }
+    // 启动异步安装任务 (Start async installation task)
+    copy_task = util::async([this, mod_path](std::stop_token stop_token) -> bool {
+        // 开始计时 (Start timing)
+        auto start_time = std::chrono::high_resolution_clock::now();
         
-        // 更新总文件数和状态 (Update total files and status)
-        {
-            std::lock_guard<std::mutex> lock(this->copy_progress_mutex);
-            this->copy_progress.total_files = total_files;
-            this->copy_progress.current_file = CALCULATE_FILES; 
-        }
-        
-        // 如果被请求停止，直接返回 (If stop requested, return immediately)
-        if (stop_token.stop_requested()) {
-            return false;
-        }
-        
-        auto progress_callback = [this](const CopyProgressInfo& progress) {
+        // 创建适配的进度回调函数 (Create adapted progress callback function)
+        auto mod_progress_callback = [this](int current, int total, const std::string& current_file, bool is_copying_file, float file_progress_percentage) {
+            CopyProgressInfo progress;
+            {
+                std::lock_guard<std::mutex> lock(this->copy_progress_mutex);
+                progress = this->copy_progress;
+            }
+            
+            // 直接使用传入的参数更新所有进度信息 (Update all progress information with passed parameters)
+            progress.files_copied = current;
+            progress.total_files = total;
+            progress.current_file = current_file;
+            progress.progress_percentage = total > 0 ? (float)current / total * 100.0f : 0.0f;
+            progress.is_copying_file = is_copying_file;
+            progress.file_progress_percentage = file_progress_percentage;
+            
             this->UpdateCopyProgress(progress);
         };
         
-        bool overall_result = true;
-        size_t copied_files = 0;
-        
-        // 依次复制每个文件夹 (Copy each folder sequentially)
-        for (const std::string& folder : target_folders) {
-            if (stop_token.stop_requested()) {
-                overall_result = false;
-                break;
+        // 创建错误回调函数 (Create error callback function)
+        auto error_callback = [this](const std::string& error_msg) {
+            CopyProgressInfo error_progress;
+            {
+                std::lock_guard<std::mutex> lock(this->copy_progress_mutex);
+                error_progress = this->copy_progress;
             }
-            
-            std::string source_path = mod_path + "/" + folder;
-            std::string dest_path = "/atmosphere/" + folder;
-            
-            // 创建带偏移的进度回调 (Create progress callback with offset)
-            auto folder_progress_callback = [this, copied_files, &progress_callback](const CopyProgressInfo& progress) {
-                CopyProgressInfo adjusted_progress = progress;
-                adjusted_progress.files_copied += copied_files;
-                progress_callback(adjusted_progress);
-            };
-            
-            bool result = CopyDirectoryRecursiveAsync(stop_token, source_path, dest_path, folder_progress_callback);
-            if (!result) {
-                overall_result = false;
-                break;
-            }
-            
-            // 更新已复制文件数 (Update copied file count)
-            copied_files += CountFilesInDirectory(source_path);
-        }
+            error_progress.has_error = true;
+            error_progress.error_message = error_msg;
+            this->UpdateCopyProgress(error_progress);
+        };
         
-        // 复制完成，更新状态 (Copy completed, update status)
+        // 使用mod_manager的统一安装接口 (Use mod_manager's unified installation interface)
+        bool install_result = this->mod_manager.getModInstallType(
+            mod_path,
+            1, // operation_type: 1=删除ZIP文件 (1=delete ZIP file)
+            mod_progress_callback,
+            error_callback,
+            stop_token
+        );
+        
+        // 安装完成，计算耗时并更新状态 (Installation completed, calculate duration and update status)
+        auto end_time = std::chrono::high_resolution_clock::now();
+        this->operation_duration = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time);
+
+
         CopyProgressInfo final_progress;
         {
             std::lock_guard<std::mutex> lock(this->copy_progress_mutex);
             final_progress = this->copy_progress;
         }
+        
         final_progress.is_completed = true;
-        final_progress.has_error = !overall_result;
-        if (!overall_result && final_progress.error_message.empty()) {
+        final_progress.has_error = !install_result;
+        // 只有在没有错误信息且安装失败时才设置默认错误信息 (Only set default error message if no error message exists and installation failed)
+        if (!install_result && final_progress.error_message.empty()) {
             final_progress.error_message = COPY_ERROR;
         }
+        // 如果安装失败但有具体错误信息，保持原有错误信息 (If installation failed but has specific error message, keep original error message)
         this->UpdateCopyProgress(final_progress);
-        
-        return overall_result;
+
+
+        return install_result;
     });
     
-    return 1; // 返回1表示开始了异步复制 (Return 1 to indicate async copy started)
+    return 1; // 返回1表示开始了异步安装 (Return 1 to indicate async installation started)
 }
-
-// 递归删除目录及其内容 (Recursively delete directory and its contents)
 
 
 // 卸载选中的MOD从atmosphere目录 (Uninstall selected MOD from atmosphere directory)
 int App::ModUninstalled() {
+    // 如果有正在运行的任务，检查是否已停止 (If there's a running task, check if it has stopped)
+    if (copy_task.valid()) {
+        auto status = copy_task.wait_for(std::chrono::milliseconds(0));
+        if (status == std::future_status::timeout) {
+            // 任务仍在运行，显示提示对话框 (Task still running, show prompt dialog)
+            this->audio_manager.PlayCancelSound();
+            this->ShowDialog(DialogType::INFO, DNOT_READY, 26.0f, NVG_ALIGN_CENTER);
+            return 0; // 返回0表示操作被阻止 (Return 0 to indicate operation blocked)
+        }
+        copy_task.request_stop(); // 请求停止当前任务 (Request to stop current task)
+    }
+    
+    
     // 检查是否有选中的MOD (Check if there is a selected MOD)
     if (this->mod_info.empty() || this->mod_index >= this->mod_info.size()) {
         return 0; // 没有选中的MOD (No selected MOD)
@@ -3622,68 +3370,6 @@ int App::ModUninstalled() {
     
     // 获取当前选中MOD的路径 (Get current selected MOD path)
     std::string mod_path = this->mod_info[this->mod_index].MOD_PATH;
-    
-    // 打开MOD目录 (Open MOD directory)
-    DIR* mod_dir = opendir(mod_path.c_str());
-    if (!mod_dir) {
-        return 0; // 无法打开MOD目录 (Cannot open MOD directory)
-    }
-    
-    std::vector<std::string> target_folders; // 目标文件夹列表 (Target folder list)
-    
-    struct dirent* entry;
-    // 遍历MOD目录下的所有条目 (Iterate through all entries in MOD directory)
-    while ((entry = readdir(mod_dir)) != nullptr) {
-        // 跳过当前目录和父目录 (Skip current and parent directory entries)
-        if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0) {
-            continue;
-        }
-        
-        // 构建完整路径检查是否为目录 (Build full path to check if it's a directory)
-        std::string full_path = mod_path + "/" + entry->d_name;
-        DIR* test_dir = opendir(full_path.c_str());
-        if (test_dir) {
-            closedir(test_dir);
-            
-            // 检查文件夹名称是否符合要求 (Check if folder name meets requirements)
-            std::string folder_name = entry->d_name;
-            if (folder_name == "exefs_patches" || folder_name == "contents") {
-                target_folders.push_back(folder_name);
-            } else {
-                // 文件夹名称不符合要求 (Folder name doesn't meet requirements)
-                closedir(mod_dir);
-                return 0;
-            }
-        }
-    }
-    
-    closedir(mod_dir);
-    
-    // 检查是否有有效的文件夹 (Check if there are valid folders)
-    if (target_folders.empty()) {
-        this->audio_manager.PlayCancelSound();
-        // 显示错误对话框，提示MOD结构无效 (Show error dialog for invalid MOD structure)
-        ShowDialog(DialogType::INFO, GetSnprintf(FILE_NONE, this->mod_info[this->mod_index].MOD_NAME2.c_str()),
-            26.0f,NVG_ALIGN_CENTER|NVG_ALIGN_MIDDLE);
-        // ShowDialog(DialogType::INFO, GetSnprintf(FAILURE_UNINSTALLED, this->mod_info[this->mod_index].MOD_NAME.c_str()));
-        return 0; // 没有有效的文件夹 (No valid folders)
-    }
-    
-    // 检查是否有任何目标路径存在 (Check if any target paths exist)
-    bool has_valid_targets = false;
-    for (const std::string& folder : target_folders) {
-        std::string target_path = "/atmosphere/" + folder;
-        DIR* target_dir = opendir(target_path.c_str());
-        if (target_dir) {
-            closedir(target_dir);
-            has_valid_targets = true;
-            break;
-        }
-    }
-    
-    if (!has_valid_targets) {
-        return 0; // 没有目标路径存在，无需卸载 (No target paths exist, no need to uninstall)
-    }
     
     // 立即显示卸载进度对话框 (Immediately show uninstall progress dialog)
     ShowCopyProgressDialog(UNINSTALLEDING_TEXT);
@@ -3691,96 +3377,70 @@ int App::ModUninstalled() {
     // 初始化进度信息，总文件数将在异步任务中更新 (Initialize progress info, total files will be updated in async task)
     {
         std::lock_guard<std::mutex> lock(this->copy_progress_mutex);
-        this->copy_progress.current_file = CALCULATE_FILES; 
+        this->copy_progress = {};
     }
     
     // 启动异步卸载任务 (Start async uninstall task)
-    copy_task = util::async([this, mod_path, target_folders](std::stop_token stop_token) -> bool {
-        // 首先统计所有文件夹需要删除的文件数量 (First count files to be removed in all folders)
-        size_t total_files = 0;
-        for (const std::string& folder : target_folders) {
-            std::string mod_source_path = mod_path + "/" + folder;
-            std::string target_path = "/atmosphere/" + folder;
-            
-            // 检查目标路径是否存在 (Check if target path exists)
-            DIR* target_dir = opendir(target_path.c_str());
-            if (target_dir) {
-                closedir(target_dir);
-                total_files += CountModFilesToRemove(mod_source_path, target_path);
+    copy_task = util::async([this, mod_path](std::stop_token stop_token) -> bool {
+        // 开始计时 (Start timing)
+        auto start_time = std::chrono::high_resolution_clock::now();
+        
+        // 创建进度回调函数 (Create progress callback function)
+        auto mod_progress_callback = [this](int current, int total, const std::string& filename, bool is_copying_file, float file_progress_percentage) {
+            CopyProgressInfo progress;
+            {
+                std::lock_guard<std::mutex> lock(this->copy_progress_mutex);
+                progress = this->copy_progress;
             }
-        }
-        
-        // 更新总文件数和状态 (Update total files and status)
-        {
-            std::lock_guard<std::mutex> lock(this->copy_progress_mutex);
-            this->copy_progress.total_files = total_files;
-            this->copy_progress.current_file = CALCULATE_FILES; // 更新状态信息 (Update status info)
-        }
-        
-        // 如果被请求停止，直接返回 (If stop requested, return immediately)
-        if (stop_token.stop_requested()) {
-            return false;
-        }
-        
-        auto progress_callback = [this](const CopyProgressInfo& progress) {
+            progress.files_copied = current;
+            progress.total_files = total;
+            progress.current_file = filename;
+            progress.progress_percentage = total > 0 ? (float)current / total * 100.0f : 0.0f;
             this->UpdateCopyProgress(progress);
         };
         
-        bool overall_result = true;
-        size_t removed_files = 0;
+        // 创建错误回调函数 (Create error callback function)
+        auto error_callback = [this](const std::string& error_message) {
+            CopyProgressInfo progress;
+            {
+                std::lock_guard<std::mutex> lock(this->copy_progress_mutex);
+                progress = this->copy_progress;
+            }
+            progress.error_message = error_message;
+            progress.has_error = true;
+            this->UpdateCopyProgress(progress);
+        };
         
-        // 依次卸载每个文件夹 (Remove each folder sequentially)
-        for (const std::string& folder : target_folders) {
-            if (stop_token.stop_requested()) {
-                overall_result = false;
-                break;
-            }
-            
-            std::string mod_source_path = mod_path + "/" + folder;
-            std::string target_path = "/atmosphere/" + folder;
-            
-            // 检查目标路径是否存在 (Check if target path exists)
-            DIR* target_dir = opendir(target_path.c_str());
-            if (!target_dir) {
-                continue; // 目标路径不存在，跳过 (Target path doesn't exist, skip)
-            }
-            closedir(target_dir);
-            
-            // 创建带偏移的进度回调 (Create progress callback with offset)
-            auto folder_progress_callback = [this, removed_files, &progress_callback](const CopyProgressInfo& progress) {
-                CopyProgressInfo adjusted_progress = progress;
-                adjusted_progress.files_copied += removed_files;
-                progress_callback(adjusted_progress);
-            };
-            
-            // 使用选择性删除，只删除与MOD源目录匹配的文件 (Use selective deletion, only remove files matching MOD source directory)
-            bool result = RemoveModFilesSelectively(stop_token, mod_source_path, target_path, folder_progress_callback);
-            if (!result) {
-                overall_result = false;
-                break;
-            }
-            
-            // 更新已删除文件数 (Update removed file count)
-            removed_files += CountModFilesToRemove(mod_source_path, target_path);
-        }
+        // 使用mod_manager的统一卸载接口 (Use mod_manager's unified uninstall interface)
+        bool uninstall_result = this->mod_manager.getModInstallType(
+            mod_path,
+            0, // operation_type: 0=卸载 (0=uninstall)
+            mod_progress_callback,
+            error_callback,
+            stop_token
+        );
         
-        // 卸载完成，更新状态 (Uninstall completed, update status)
+        // 卸载完成，计算耗时并更新状态 (Uninstall completed, calculate duration and update status)
+        auto end_time = std::chrono::high_resolution_clock::now();
+        this->operation_duration = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time);
+        
         CopyProgressInfo final_progress;
         {
             std::lock_guard<std::mutex> lock(this->copy_progress_mutex);
             final_progress = this->copy_progress;
         }
         final_progress.is_completed = true;
-        final_progress.has_error = !overall_result;
-        if (!overall_result && final_progress.error_message.empty()) {
+        final_progress.has_error = !uninstall_result;
+        if (!uninstall_result && final_progress.error_message.empty()) {
             final_progress.error_message = UNINSTALLED_ERROR;
         }
         this->UpdateCopyProgress(final_progress);
         
-        return overall_result;
+        return uninstall_result;
     });
     
     return 1; // 返回1表示开始了异步卸载 (Return 1 to indicate async uninstall started)
 }
+
 
 } // namespace tj
