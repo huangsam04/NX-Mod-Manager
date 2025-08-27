@@ -37,9 +37,12 @@ include $(DEVKITPRO)/libnx/switch_rules
 #   of a homebrew executable (.nro). This is intended to be used for sysmodules.
 #   NACP building is skipped as well.
 #---------------------------------------------------------------------------------
-APP_TITLE	:= NX Mod Manager
+#   BBBBBBBBBBBBBBB             424242424242424242424242424242
+#   模组管理器                   E6A8A1E7BB84E7AEA1E79086E599A8
+
+APP_TITLE	:= BBBBBBBBBBBBBBB
 APP_AUTHOR	:= Tom
-APP_VERSION	:= "1.0.0"
+APP_VERSION	:= "1.2.0"
 ICON		:= assets/icon.jpg
 
 TARGET		:=	NX-Mod-Manager
@@ -48,6 +51,8 @@ BUILD		:=	nxbuild
 SOURCES     :=	src src/utils
 # yyjson
 SOURCES		+=	src/yyjson
+# miniz
+SOURCES		+=	src/miniz
 # nanovg
 SOURCES		+=	src/nanovg src/nanovg/deko3d src/nanovg/deko3d/framework src/nanovg/deko3d/shaders
 DATA		:=	data
