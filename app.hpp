@@ -4,6 +4,7 @@
 #include "nanovg/deko3d/dk_renderer.hpp"
 #include "async.hpp"
 #include "audio_manager.hpp"
+#include "mod_manager.hpp"
 #include "yyjson/yyjson.h"
 
 #include <switch.h>
@@ -300,6 +301,11 @@ private:
     // 游戏名称映射相关 (Game name mapping related)
     std::unordered_map<std::string, ModNameInfo> game_name_cache; // 缓存已加载的游戏名称映射数据 (Cache for loaded game name mapping data)
     
+    // MOD管理器相关 (MOD manager related)
+    ModManager mod_manager; // MOD压缩解压管理器 (MOD compression/decompression manager)
+    util::AsyncFurture<bool> mod_install_task; // 异步MOD安装任务 (Async MOD installation task)
+    bool mod_install_in_progress{false}; // MOD安装是否正在进行 (Whether MOD installation is in progress)
+    
     void Draw();
     void Update();
     void Poll();
@@ -363,36 +369,13 @@ private:
     void ChangeModName(); // 切换当前选中模组的安装状态并修改名称 (Toggle current selected mod install status and modify name)
     int ModInstalled(); // 安装选中的MOD到atmosphere目录 (Install selected MOD to atmosphere directory)
     int ModUninstalled(); // 卸载选中的MOD从atmosphere目录 (Uninstall selected MOD from atmosphere directory)
-
-    // 已删除 CopyFile 函数，使用 CopyFileWithProgress 替代 (Removed CopyFile function, use CopyFileWithProgress instead)
-    bool CopyFileWithProgress(const std::string& source_path, const std::string& dest_path, 
-                              std::function<void(const CopyProgressInfo&)> progress_callback); // 带进度回调的文件复制 (Copy file with progress callback)
     
-    
-    
-    // 简化的两阶段安装流程函数 (Simplified two-phase installation functions)
-    size_t CountFilesAndCacheWithProgress(const std::string& source_path, const std::string& target_path,
-                                           std::function<void(const CopyProgressInfo&)> progress_callback,
-                                           size_t base_offset = 0); // 统计文件并缓存路径，支持基础偏移量 (Count files and cache paths with base offset support)
-    bool CopyFromCachedFiles(std::stop_token stop_token, const std::string& target_base_path,
-                            std::function<void(const CopyProgressInfo&)> progress_callback); // 从缓存的文件路径进行复制 (Copy from cached file paths)
-    
-    // 删除目录相关函数 (Directory deletion related functions)
-    
-    // 简化的文件路径缓存 (Simplified file path cache)
-    std::vector<std::string> cached_source_files; // 缓存的源文件路径列表 (Cached source file paths)
     
 
+
+   
     
-    // 删除相关函数 (Deletion related functions)
-    // CountModFilesToRemove 函数已删除，直接使用 CountModFilesToRemoveWithProgress
-    size_t CountModFilesToRemoveWithProgress(const std::string& mod_source_path,
-                                             std::function<void(const CopyProgressInfo&)> progress_callback,
-                                             size_t* current_counted); // 带进度回调的删除文件统计并缓存路径 (Count files to remove with progress callback and cache paths)
-    bool RemoveModFilesFromCache(std::stop_token stop_token, const std::string& target_base_path,
-                                std::function<void(const CopyProgressInfo&)> progress_callback); // 基于缓存路径删除文件 (Remove files based on cached paths)
-
-
+    
 
 
 private: // from nanovg decko3d example by adubbz
