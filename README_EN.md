@@ -230,6 +230,8 @@ SSM2/
 
 Thanks to the following open source projects and libraries for their contributions:
 
+- **[untitled](https://github.com/ITotalJustice/untitled)** - ITotalJustice untitled
+
 ### Core Dependencies
 - **[devkitPro](https://devkitpro.org/)** - Nintendo Switch development toolchain
 - **[libnx](https://github.com/switchbrew/libnx)** - Switch system library providing low-level API support
