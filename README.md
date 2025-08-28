@@ -230,6 +230,8 @@ SSM2/
 
 感谢以下开源项目和库的贡献：
 
+- **[untitled](https://github.com/ITotalJustice/untitled)** - ITotalJustice的untitled
+
 ### 核心依赖
 - **[devkitPro](https://devkitpro.org/)** - Nintendo Switch开发工具链
 - **[libnx](https://github.com/switchbrew/libnx)** - Switch系统库，提供底层API支持
