@@ -2804,7 +2804,25 @@ void App::DrawDialog() {
                              24.0f , 1.4f, 
                              this->mod_info[this->mod_index].MOD_NAME2.c_str(), nullptr, 
                              NVG_ALIGN_CENTER | NVG_ALIGN_MIDDLE, gfx::Colour::WHITE);
-        
+
+
+
+
+
+        // 绘制当前复制的文件名 (Draw current copying file name)
+        if (!progress_info.current_file.empty()) {
+            gfx::drawTextBoxCentered(this->vg, progress_bar_x +3.f, progress_bar_y-35.0f, progress_bar_width - 6.f, 35.0f ,
+                             20.0f, 1.4f,
+                             progress_info.current_file.c_str(), nullptr,
+                             NVG_ALIGN_LEFT | NVG_ALIGN_MIDDLE, gfx::Colour::WHITE);
+        }
+
+        // 文件数量背景 ，防止被文件名挡住了
+        nvgBeginPath(this->vg);
+        nvgRoundedRect(this->vg, dialog_x + dialog_width * 0.65, progress_bar_y-45.0f, dialog_width * 0.35, 45.0f , 0.0f);
+        nvgFillColor(this->vg, nvgRGB(45, 45, 45));
+        nvgFill(this->vg);
+
         // 绘制文件进度信息 (Draw file progress info)
         char progress_text[128];
         snprintf(progress_text, sizeof(progress_text), "%zu / %zu",
@@ -2814,13 +2832,7 @@ void App::DrawDialog() {
                          progress_text, nullptr,
                          NVG_ALIGN_RIGHT | NVG_ALIGN_MIDDLE, gfx::Colour::WHITE);
 
-        // 绘制当前复制的文件名 (Draw current copying file name)
-        if (!progress_info.current_file.empty()) {
-            gfx::drawTextBoxCentered(this->vg, progress_bar_x +3.f, progress_bar_y-35.0f, progress_bar_width - 6.f, 35.0f ,
-                             20.0f, 1.4f,
-                             progress_info.current_file.c_str(), nullptr,
-                             NVG_ALIGN_LEFT | NVG_ALIGN_MIDDLE, gfx::Colour::WHITE);
-        }
+        
         
         // 绘制进度百分比文字 (Draw progress percentage text)
         nvgFontSize(this->vg, 18.0f);
@@ -3057,6 +3069,7 @@ void App::UpdateDialog() {
 
             
         }else if (this->controller.B || (this->controller.A && !this->dialog_selected_ok)) {
+            this->clean_button = false;
             this->audio_manager.PlayConfirmSound(); // 播放确认音效 (Play confirm sound effect)
             this->HideDialog(); // 隐藏对话框 (Hide dialog)
         }

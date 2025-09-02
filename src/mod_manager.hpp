@@ -36,21 +36,34 @@ public:
 
     
     /**
-     * 解压ZIP文件到目标目录
+     * 解压ZIP文件到目标目录（简化版本，不使用小文件聚合，直接按顺序写入SD卡）
+     * 注意：此函数必须接收已初始化的ZIP读取器，不会自行创建ZIP读取器
+     * @param zip_path ZIP文件路径（用于错误信息显示）
+     * @param progress_callback 进度回调函数
+     * @param error_callback 错误回调函数
+     * @param stop_token 停止令牌，用于中断操作
+     * @param zip_archive_ptr 已初始化的mz_zip_archive指针（必须非空）
+     * @return 成功返回true，失败返回false
+     */
+    bool extractMod(const std::string& zip_path,
+                     ProgressCallback progress_callback = nullptr,
+                     ErrorCallback error_callback = nullptr,
+                     std::stop_token stop_token = {},
+                     void* zip_archive_ptr = nullptr);
+    
+
+    /**
+     * 解压ZIP文件到目标目录（简化版本，不使用小文件聚合，直接按顺序写入SD卡）
      * @param zip_path ZIP文件路径
-     * @param target_directory 目标目录路径
      * @param progress_callback 进度回调函数
      * @param error_callback 错误回调函数
      * @param stop_token 停止令牌，用于中断操作
      * @return 成功返回true，失败返回false
      */
-    bool extractMod(const std::string& zip_path,
-                    ProgressCallback progress_callback = nullptr,
-                    ErrorCallback error_callback = nullptr,
-                    std::stop_token stop_token = {});
-    
-
-    
+    bool extractMod2(const std::string& zip_path,
+                     ProgressCallback progress_callback = nullptr,
+                     ErrorCallback error_callback = nullptr,
+                     std::stop_token stop_token = {});    
 
     
     /**
@@ -99,10 +112,30 @@ public:
      * @param stop_token 停止令牌，用于中断操作
      * @return 成功返回true，失败返回false
      */
-    bool copyFilesBatch(const std::vector<std::pair<std::string, std::string>>& file_pairs,
-                       ProgressCallback progress_callback = nullptr,
-                       ErrorCallback error_callback = nullptr,
-                       std::stop_token stop_token = {});
+    // 文件信息结构体 (File info structure)
+    struct FileInfo {
+        std::string source_path;  // 源路径 (Source path)
+        std::string target_path;  // 目标路径 (Target path)
+        size_t file_size;         // 文件大小 (File size)
+    };
+    
+    bool copyFilesBatch(const std::vector<FileInfo>& file_info_list,
+                         ProgressCallback progress_callback = nullptr,
+                         ErrorCallback error_callback = nullptr,
+                         std::stop_token stop_token = {});
+    
+    /**
+     * 批量复制文件（简化版本，不聚集小文件，直接按顺序写入）
+     * @param file_info_list 文件信息列表
+     * @param progress_callback 进度回调函数
+     * @param error_callback 错误回调函数
+     * @param stop_token 停止令牌，用于中断操作
+     * @return 成功返回true，失败返回false
+     */
+    bool copyFilesBatch2(const std::vector<FileInfo>& file_info_list,
+                          ProgressCallback progress_callback = nullptr,
+                          ErrorCallback error_callback = nullptr,
+                          std::stop_token stop_token = {});
     
     /**
      * 卸载文件夹类型的MOD（删除atmosphere目录中对应的文件）

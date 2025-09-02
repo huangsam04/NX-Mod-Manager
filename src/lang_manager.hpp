@@ -95,6 +95,7 @@ extern std::string ZIP_READ_ERROR;
 extern std::string CANT_READ_ERROR;
 extern std::string CANT_CREATE_ERROR;
 extern std::string CANT_WRITE_ERROR;
+extern std::string Aggregating_Files;
 
 namespace tj {
 

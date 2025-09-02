@@ -94,6 +94,7 @@ std::string ZIP_READ_ERROR;
 std::string CANT_READ_ERROR;
 std::string CANT_CREATE_ERROR;
 std::string CANT_WRITE_ERROR;
+std::string Aggregating_Files;
 
 namespace tj {
 
@@ -355,6 +356,7 @@ bool LangManager::loadLanguage(const std::string& langCode) {
             {"CANT_READ_ERROR", std::ref(CANT_READ_ERROR)},
             {"CANT_CREATE_ERROR", std::ref(CANT_CREATE_ERROR)},
             {"CANT_WRITE_ERROR", std::ref(CANT_WRITE_ERROR)},
+            {"Aggregating_Files", std::ref(Aggregating_Files)},
         };
 
         // 遍历映射表进行赋值 - 修改为更兼容的遍历方式
