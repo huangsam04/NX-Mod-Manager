@@ -8,15 +8,20 @@ The plugin supports local data caching, and for 20+ systems, except for the slow
 
 ## Installation Speed
 
-Taking Lin Ke'er mod as an example, 2700+ files, 500MB.
-
-File-based installation time: 1 minute 40 seconds to 2 minutes, uninstallation time: 20 seconds.
-
-ZIP-based installation time: 1 minute 05 seconds to 1 minute 20 seconds, uninstallation time: 20 seconds.
-
-ZIP compression should use standard format. Only ZIP format is supported, 7z\RAR formats are not supported.
-
 **Note**: The first level inside the ZIP package must be `contents` and `exefs_patches`, otherwise it cannot be recognized. The name of the ZIP package does not matter.
+**Note**: ZIP compression should use standard format. Only ZIP format is supported, 7z\RAR formats are not supported.
+
+**Taking Lin Ke'er mod as an example, 2700+ files, 500MB.**
+
+File-based installation time: 1-1 minute 20 seconds, uninstallation time: 15-20 seconds.
+
+ZIP-based installation time: 1-1 minute 20 seconds, uninstallation time: 15-20 seconds.
+
+**Taking Princess Flower mod as an example, 13805 files, 1.15GB.**
+
+File-based installation time: 7 minutes 10 seconds, uninstallation time: 1 minute 30 seconds.
+
+ZIP-based installation time: 4 minutes 50 seconds - 5 minutes 03 seconds, uninstallation time: 1 minute 30 seconds.
 
 ## Usage
 
