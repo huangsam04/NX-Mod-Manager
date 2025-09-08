@@ -44,33 +44,6 @@ extern std::string COSMETIC_TEXT;
 extern std::string NONE_TEXT;
 extern std::string PLAY_TEXT;
 
-// 说明文本 (Instruction texts)
-extern std::string INSTRUCTION_LINE_1;
-extern std::string INSTRUCTION_LINE_2;
-extern std::string INSTRUCTION_LINE_3;
-extern std::string INSTRUCTION_LINE_4;
-extern std::string INSTRUCTION_LINE_5;
-extern std::string INSTRUCTION_LINE_6;
-extern std::string INSTRUCTION_LINE_7;
-extern std::string INSTRUCTION_LINE_8;
-extern std::string INSTRUCTION_LINE_9;
-extern std::string INSTRUCTION_LINE_10;
-extern std::string INSTRUCTION_LINE_11;
-extern std::string INSTRUCTION_LINE_12;
-extern std::string INSTRUCTION_LINE_13;
-extern std::string INSTRUCTION_LINE_14;
-extern std::string INSTRUCTION_LINE_15;
-extern std::string INSTRUCTION_LINE_16;
-extern std::string INSTRUCTION_LINE_17;
-extern std::string INSTRUCTION_LINE_18;
-extern std::string INSTRUCTION_LINE_19;
-extern std::string INSTRUCTION_LINE_20;
-extern std::string INSTRUCTION_LINE_21;
-extern std::string INSTRUCTION_LINE_22;
-extern std::string INSTRUCTION_LINE_23;
-extern std::string INSTRUCTION_LINE_24;
-
-
 extern std::string CONFIRM_INSTALLED;
 extern std::string CONFIRM_UNINSTALLED;
 extern std::string SUCCESS_INSTALLED;
@@ -96,6 +69,31 @@ extern std::string CANT_READ_ERROR;
 extern std::string CANT_CREATE_ERROR;
 extern std::string CANT_WRITE_ERROR;
 extern std::string Aggregating_Files;
+
+extern std::string Add_Mod_BUTTON;
+extern std::string Game_VERSION_TAG;
+extern std::string MOD_VERSION_TAG;
+extern std::string MOD_COUNT_TAG;
+extern std::string OPTION_BUTTON;
+extern std::string LIST_OPTION_TEXT;
+extern std::string MODLIST_OPTION_TEXT;
+extern std::string NAME_INPUT_TEXT;
+extern std::string MOD_DESCRIPTION_TEXT;
+extern std::string MODTYPE_OPTION_TEXT;
+extern std::string MOD_VERSION_INPUT_TEXT;
+extern std::string BUTTON_CANCEL;
+extern std::string OPTION_MEMU_TITLE;
+extern std::string OPTION_MODTYPE_MEMU_TITLE;
+extern std::string OPTION_APPENDMOD_MEMU_TITLE;
+extern std::string ADDING_MOD_TEXT;
+extern std::string ADD_MOD_DONE_TEXT;
+extern std::string ADD_MOD_STOP_TEXT;
+extern std::string VERSION_TAG;
+extern std::string CREATE_GAME_DIR_ERROR;
+extern std::string CREATE_GAME_ID_DIR_ERROR;
+extern std::string UNKNOWN_ERROR;
+extern std::string READD_ERROR;
+extern std::string NO_FOUND_MOD_ERROR;
 
 namespace tj {
 

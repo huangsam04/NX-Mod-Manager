@@ -30,6 +30,7 @@ ModManager::~ModManager() {
 // 顺序写入，比extractMod2函数快几秒，真奇怪
 // extractMod函数：简化版本，不使用小文件聚合，直接按顺序写入SD卡 (extractMod2 function: simplified version, no small file aggregation, direct sequential write to SD card)
 bool ModManager::extractMod(const std::string& zip_path,
+                            int& files_total,
                             ProgressCallback progress_callback,
                             ErrorCallback error_callback,
                             std::stop_token stop_token,
@@ -142,16 +143,8 @@ bool ModManager::extractMod(const std::string& zip_path,
             
             size_t bytes_read = mz_zip_reader_extract_iter_read(iter_state, aligned_buffer, to_read);
             if (bytes_read > 0) {
-                // 如果是最后一块且不足块大小，对齐到块边界 (If last chunk and less than block size, align to block boundary)
-                size_t write_size = bytes_read;
-                if (remaining < ALIGNED_BUFFER_SIZE && (bytes_read % SD_BLOCK_SIZE) != 0) {
-                    size_t aligned_write = ((bytes_read + SD_BLOCK_SIZE - 1) / SD_BLOCK_SIZE) * SD_BLOCK_SIZE;
-                    // 清零填充区域 (Zero-fill padding area)
-                    memset(aligned_buffer + bytes_read, 0, aligned_write - bytes_read);
-                    write_size = aligned_write;
-                }
-                
-                if (fwrite(aligned_buffer, 1, write_size, dest_file) != write_size) {
+                // 写入实际读取的字节数，保持文件原始大小 (Write actual bytes read, maintain original file size)
+                if (fwrite(aligned_buffer, 1, bytes_read, dest_file) != bytes_read) {
                     file_success = false;
                     break;
                 }
@@ -161,7 +154,7 @@ bool ModManager::extractMod(const std::string& zip_path,
                 if (progress_callback && file_size > 8 * 1024 * 1024) {
                     int progress_percent = (int)((total_written * 100) / file_size);
                     // 实时更新进度 (Real-time progress update)
-                    progress_callback(processed_files, num_files, filename_ptr, true, (float)progress_percent);
+                    progress_callback(processed_files, files_total, filename_ptr, true, (float)progress_percent);
                     last_progress = progress_percent;
                 }
             }
@@ -190,7 +183,7 @@ bool ModManager::extractMod(const std::string& zip_path,
             
             // 更新总体进度 (Update overall progress)
             if (progress_callback) {
-                progress_callback(processed_files, num_files, filename_ptr, false, 0.0f);
+                progress_callback(processed_files, files_total, filename_ptr, false, 0.0f);
             }
         }
     }
@@ -1054,6 +1047,7 @@ bool ModManager::installModFromZipDirect(const std::string& zip_path,
     std::vector<std::string> all_directories; // 直接使用vector收集目录列表
     std::set<std::string> first_level_dirs;
     int num_files = static_cast<int>(mz_zip_reader_get_num_files(&zip_archive));
+    int files_total = 0;
     
     for (int i = 0; i < num_files; i++) {
         mz_zip_archive_file_stat file_stat;
@@ -1077,6 +1071,7 @@ bool ModManager::installModFromZipDirect(const std::string& zip_path,
         
         // 收集所有需要创建的目录路径（包括所有父目录层次）- 优化版本
         if (!mz_zip_reader_is_file_a_directory(&zip_archive, i)) {
+            files_total++;
             size_t last_slash = filename.find_last_of('/');
             if (last_slash != std::string::npos) {
                 // 使用string_view避免字符串拷贝，优化路径解析性能
@@ -1155,13 +1150,9 @@ bool ModManager::installModFromZipDirect(const std::string& zip_path,
     };
     
     // 直接解压到atmosphere目录（目录已预创建）
-    bool extract_success = extractMod(zip_path, extract_progress, error_callback, stop_token, &zip_archive);
+    bool extract_success = extractMod(zip_path, files_total, extract_progress, error_callback, stop_token, &zip_archive);
     //完成解压后关闭ZIP读取器
     mz_zip_reader_end(&zip_archive);
-
-    if (extract_success && progress_callback) {
-        progress_callback(num_files, num_files, "", false, 0.0f);
-    }
     
     return extract_success;
 }
@@ -1612,10 +1603,8 @@ bool ModManager::copyFilesBatch(const std::vector<FileInfo>& file_info_list,
                  
                  size_t bytes_read = fread(aligned_buffer, 1, to_read, source_file);
                  if (bytes_read > 0) {
-                     // SD卡块对齐写入 (SD Card block-aligned write)
-                     size_t write_size = (remaining < ALIGNED_BUFFER_SIZE && (bytes_read % SD_BLOCK_SIZE) != 0) ? aligned_read : bytes_read;
-                     
-                     if (fwrite(aligned_buffer, 1, write_size, dest_file) != write_size) {
+                     // 写入实际读取的字节数，不进行块对齐填充 (Write actual bytes read, no block alignment padding)
+                     if (fwrite(aligned_buffer, 1, bytes_read, dest_file) != bytes_read) {
                          file_success = false;
                          break;
                      }
@@ -1858,6 +1847,7 @@ bool ModManager::createDirectoriesBatch(std::vector<std::string>& directories,
         }
         
         if (mkdir(dir_path.c_str(), 0755) != 0 && errno != EEXIST) {
+
             if (error_callback) {
                 error_callback(CANT_CREATE_DIR + dir_path + ", errno: " + std::to_string(errno));
             }

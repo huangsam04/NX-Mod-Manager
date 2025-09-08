@@ -305,7 +305,121 @@ void drawTextArgs(NVGcontext* vg, float x, float y, float size, int align, Colou
 }
 
 void drawButton(NVGcontext* vg, float x, float y, float size, Button button) {
-    drawText(vg, x, y, size, getButton(button), nullptr, NVG_ALIGN_LEFT | NVG_ALIGN_MIDDLE, getColour(Colour::WHITE));
+    drawText(vg, x, y, size, getButton(button), nullptr, NVG_ALIGN_CENTER | NVG_ALIGN_MIDDLE, Colour::WHITE);
+}
+
+// 绘制包含按钮标记的文本（如[PLUS]）
+void drawTextWithButtonMarker(NVGcontext* vg, float x, float y, float size, const char* str, const char* end, int align, Colour c) {
+    if (!str) return;
+    
+    // 查找[PLUS]标记
+    const char* marker_start = nullptr;
+    const char* marker_end = nullptr;
+    const char* current = str;
+    
+    // 寻找[PLUS]标记
+    while (current && (end == nullptr || current < end)) {
+        if (*current == '[') {
+            const char* bracket_end = current + 1;
+            while (bracket_end && (end == nullptr || bracket_end < end) && *bracket_end != ']' && *bracket_end != '\0') {
+                bracket_end++;
+            }
+            if (*bracket_end == ']') {
+                // 检查是否是PLUS标记
+                if ((bracket_end - current - 1) == 4 && 
+                    current[1] == 'P' && current[2] == 'L' && current[3] == 'U' && current[4] == 'S') {
+                    marker_start = current;
+                    marker_end = bracket_end + 1;
+                    break;
+                }
+            }
+        }
+        current++;
+        if (*current == '\0') break;
+    }
+    
+    // 如果没有找到[PLUS]标记，直接绘制原文本
+    if (!marker_start) {
+        drawText(vg, x, y, size, str, end, align, c);
+        return;
+    }
+    
+    // 计算各部分的宽度
+    nvgFontSize(vg, size);
+    nvgFontFace(vg, "Standard");
+    
+    // 第一部分文本（[PLUS]之前）
+    float part1_width = 0;
+    if (marker_start > str) {
+        part1_width = nvgTextBounds(vg, 0, 0, str, marker_start, nullptr);
+    }
+    
+    // 按钮部分
+    nvgFontFace(vg, "Extended");
+    const char* plus_char = getButton(Button::PLUS);
+    float button_width = nvgTextBounds(vg, 0, 0, plus_char, nullptr, nullptr);
+    
+    // 第二部分文本（[PLUS]之后）
+    nvgFontFace(vg, "Standard");
+    float part2_width = 0;
+    if (marker_end && (end == nullptr || marker_end < end) && *marker_end != '\0') {
+        part2_width = nvgTextBounds(vg, 0, 0, marker_end, end, nullptr);
+    }
+    
+    // 计算总宽度和起始位置（图标两边各加5.0f间距）
+    float icon_spacing = 5.0f;
+    float total_width = part1_width + (part1_width > 0 ? icon_spacing : 0) + button_width + (part2_width > 0 ? icon_spacing : 0) + part2_width;
+    float current_x = x;
+    
+    // 根据对齐方式调整起始位置
+    if (align & NVG_ALIGN_CENTER) {
+        current_x -= total_width / 2.0f;
+    } else if (align & NVG_ALIGN_RIGHT) {
+        current_x -= total_width;
+    }
+    
+    // 设置垂直对齐
+    int vertical_align = align & (NVG_ALIGN_TOP | NVG_ALIGN_MIDDLE | NVG_ALIGN_BOTTOM | NVG_ALIGN_BASELINE);
+    if (vertical_align == 0) vertical_align = NVG_ALIGN_BASELINE;
+    
+    nvgFillColor(vg, getColour(c));
+    
+    // 绘制第一部分文本
+    if (part1_width > 0) {
+        nvgFontFace(vg, "Standard");
+        nvgTextAlign(vg, NVG_ALIGN_LEFT | vertical_align);
+        nvgText(vg, current_x, y, str, marker_start);
+        current_x += part1_width + icon_spacing; // 添加图标前间距
+    }
+    
+    // 绘制按钮
+    nvgFontFace(vg, "Extended");
+    nvgTextAlign(vg, NVG_ALIGN_LEFT | vertical_align);
+    nvgText(vg, current_x, y, plus_char, nullptr);
+    current_x += button_width;
+    
+    // 绘制第二部分文本
+    if (part2_width > 0) {
+        current_x += icon_spacing; // 添加图标后间距
+        nvgFontFace(vg, "Standard");
+        nvgTextAlign(vg, NVG_ALIGN_LEFT | vertical_align);
+        nvgText(vg, current_x, y, marker_end, end);
+    }
+}
+
+void drawRoundedRect(NVGcontext* vg, float x, float y, float w, float h, float r, int red, int green, int blue) {
+    nvgBeginPath(vg);
+    nvgRoundedRect(vg, x, y, w, h, r);
+    nvgFillColor(vg, nvgRGB(red, green, blue));
+    nvgFill(vg);
+}
+
+// 绘制可变圆角矩形实现 (Draw rounded rectangle with varying corners implementation)
+void drawRoundedRectVarying(NVGcontext* vg, float x, float y, float w, float h, float radiusTopLeft, float radiusTopRight, float radiusBottomRight, float radiusBottomLeft, int red, int green, int blue) {
+    nvgBeginPath(vg);
+    nvgRoundedRectVarying(vg, x, y, w, h, radiusTopLeft, radiusTopRight, radiusBottomRight, radiusBottomLeft);
+    nvgFillColor(vg, nvgRGB(red, green, blue));
+    nvgFill(vg);
 }
 
 } // namespace tj::gfx

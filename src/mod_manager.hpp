@@ -46,6 +46,7 @@ public:
      * @return 成功返回true，失败返回false
      */
     bool extractMod(const std::string& zip_path,
+                     int& files_total,
                      ProgressCallback progress_callback = nullptr,
                      ErrorCallback error_callback = nullptr,
                      std::stop_token stop_token = {},

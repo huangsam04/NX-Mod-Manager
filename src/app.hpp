@@ -32,13 +32,14 @@ struct ModNameInfo {
 
 using AppID = std::uint64_t;
 
-enum class MenuMode { LOAD, LIST, MODLIST, INSTRUCTION };
+enum class MenuMode { LOAD, LIST, MODLIST, INSTRUCTION, ADDGAMELIST };
 
 // 对话框类型枚举 (Dialog type enumeration)
 enum class DialogType {
     INFO,           // 信息对话框 (Information dialog)
     CONFIRM,        // 确认对话框 (Confirmation dialog)
     COPY_PROGRESS,  // 复制进度对话框 (Copy progress dialog)
+    LIST_SELECT,    // 列表选择对话框 (List select dialog)
 };
 
 // 复制进度信息结构体 (Copy progress info structure)
@@ -107,6 +108,20 @@ struct AppEntry final {
     std::string MOD_TOTAL;
 };
 
+struct AppEntry_AddGame final {
+    std::string name;
+
+    std::string display_version;
+    AppID id;
+    int image;
+    bool own_image{false};
+    
+    // 缓存的原始图标数据，避免重复从缓存读取
+    // Cached raw icon data to avoid repeated cache reads
+    std::vector<unsigned char> cached_icon_data;
+    bool has_cached_icon{false};
+};
+
 
 struct MODINFO final {
     std::string MOD_NAME;
@@ -168,14 +183,23 @@ private:
     // 快速获取应用基本信息并缓存图标数据
     // Fast get application basic info and cache icon data
     bool TryGetAppBasicInfoWithIconCache(u64 application_id, AppEntry& entry);
+    bool TryGetAppBasicInfoWithIconCacheForAddGame(u64 application_id, AppEntry_AddGame& entry); // 专用于AddGame界面的应用信息获取函数 (Dedicated app info function for AddGame interface)
+    std::string TryGetAppEnglishName(u64 application_id);
+    
+    Result GetAllApplicationIds(std::vector<u64>& app_ids);
     
     // 分离式扫描：第一阶段快速扫描应用名称
     // Separated scanning: Phase 1 - Fast scan application names
     void FastScanNames(std::stop_token stop_token);
     
+    // 专用异步扫描函数：扫描设备上所有游戏
+    // Dedicated async scan function: scan all games on device
+    void FastScanAllGames(std::stop_token stop_token);
+    
     // 基于视口的智能图标加载：根据光标位置优先加载可见区域的图标
     // Viewport-aware smart icon loading: prioritize loading icons in visible area based on cursor position
     void LoadVisibleAreaIcons();
+    void LoadAddGameVisibleAreaIcons(); // 为AddGame界面加载可见区域图标 (Load visible area icons for AddGame interface)
 
     // 辅助函数：根据filename_path获取其下面的modid和modid下面的子目录名称（使用标准C库）
     // Helper function: Get modid and subdirectory names under filename_path (using standard C library)
@@ -184,7 +208,22 @@ private:
     // 对比mod版本和游戏版本是否一致的辅助函数 (Helper function to compare mod version and game version consistency)
     bool CompareModGameVersion(const std::string& mod_version, const std::string& game_version);
     
+    // 辅助函数：确保JSON文件存在，如果不存在则创建空JSON文件
+    // Helper function: Ensure JSON file exists, create empty JSON file if not
+    bool EnsureJsonFileExists(const std::string& json_path);
     
+    // JSON文件键值操作函数：替换现有键的值（如果键不存在则添加）
+    // JSON file key-value operation function: replace existing key value (add if key doesn't exist)
+    bool UpdateJsonKeyValue(const std::string& json_path, const std::string& key, const std::string& value);
+    
+    // MOD专用JSON文件键值操作函数：处理嵌套的JSON结构修改
+    // MOD-specific JSON file key-value operation function: handle nested JSON structure modifications
+    bool UpdateJsonKeyValue_MOD(const std::string& json_path, const std::string& root_key, 
+                                const std::string& nested_key, const std::string& nested_value);
+    
+    // MOD专用JSON文件根键操作函数：仅处理根键的创建或修改
+    // MOD-specific JSON file root key operation function: handle root key creation or modification only
+    bool UpdateJsonKey_MOD(const std::string& json_path, const std::string& old_root_key, const std::string& new_root_key);
     
     // 计算当前可见区域的应用索引范围
     // Calculate the index range of applications in current visible area
@@ -198,12 +237,17 @@ private:
     // Last time LoadVisibleAreaIcons was called, for debouncing
     mutable std::chrono::steady_clock::time_point last_load_time{};
     
+    // AddGame界面的可见区域缓存和防抖机制 (AddGame interface visible area caching and debouncing mechanism)
+    mutable std::pair<size_t, size_t> last_addgame_loaded_range{SIZE_MAX, SIZE_MAX};
+    mutable std::chrono::steady_clock::time_point last_addgame_load_time{};
+    
     // 列表界面视口感知图标加载的防抖和缓存机制 (Debouncing and caching mechanism for list interface viewport-aware icon loading)
 
     static constexpr auto LOAD_DEBOUNCE_MS = std::chrono::milliseconds(100); // 防抖延迟100ms (100ms debounce delay)
 
     NVGcontext* vg{nullptr};
     std::vector<AppEntry> entries;
+    std::vector<AppEntry_AddGame> entries_AddGame;
     std::vector<MODINFO> mod_info;
 
     PadState pad{};
@@ -224,6 +268,7 @@ private:
 
     std::mutex mutex{};
     static std::mutex entries_mutex;
+    static std::mutex entries_AddGame_mutex;
 
     bool finished_scanning{false}; // mutex locked
 
@@ -231,6 +276,11 @@ private:
     static std::atomic<size_t> scanned_count;
     static std::atomic<size_t> total_count;
     static std::atomic<bool> is_scan_running;
+    
+    // ADDGAMELIST界面专用的扫描状态变量 (Dedicated scanning state variables for ADDGAMELIST interface)
+    static std::atomic<size_t> addgame_scanned_count;
+    static std::atomic<size_t> addgame_total_count;
+    static std::atomic<bool> addgame_scan_running;
     
     
 
@@ -249,6 +299,12 @@ private:
     float ypos{130.f};
     std::size_t start{0};
     std::size_t index{}; // where i am in the array
+    
+    // ADDGAMELIST界面独立的索引变量 (Independent index variables for ADDGAMELIST interface)
+    std::size_t index_AddGame{0};  // ADDGAMELIST界面中的当前选中项索引 (Current selected item index in ADDGAMELIST interface)
+    std::size_t start_AddGame{0};  // ADDGAMELIST界面显示的起始索引 (Start index for ADDGAMELIST interface display)
+    float yoff_AddGame{130.f};     // ADDGAMELIST界面的Y坐标偏移量 (Y coordinate offset for ADDGAMELIST interface)
+    float ypos_AddGame{130.f};     // ADDGAMELIST界面的Y坐标位置 (Y coordinate position for ADDGAMELIST interface)
     
     // MOD列表独立的索引变量 (Independent index variables for MOD list)
     std::size_t mod_index{0};  // MOD列表中的当前选中项索引 (Current selected item index in MOD list)
@@ -276,6 +332,18 @@ private:
     bool dialog_selected_ok{true};            // 对话框中选中的按钮（true=确定，false=取消）(Selected button in dialog)
     float dialog_content_font_size{18.0f};    // 对话框内容字体大小 (Dialog content font size)
     int dialog_content_align{NVG_ALIGN_CENTER | NVG_ALIGN_MIDDLE}; // 内容对齐方式 (Content alignment)
+    
+    // LIST_SELECT对话框相关成员变量 (LIST_SELECT dialog related member variables)
+    std::vector<std::string> dialog_list_items; // 列表选择项 (List selection items)
+    size_t dialog_list_selected_index{0};      // 当前选中的列表项索引 (Currently selected list item index)
+    size_t dialog_list_start_index{0};         // 列表显示的起始索引，用于分页 (Start index for list display, used for paging)
+    int dialog_list_selected_result{-1};       // 用户选择的结果索引，-1表示未选择或取消 (User selected result index, -1 means not selected or cancelled)
+    int dialog_list_type{-1}; // 对话框菜单类型 
+    std::string dialog_list_title{""}; // 对话框标题
+    
+    // 多选功能相关成员变量 (Multi-selection related member variables)
+    std::vector<std::string> dialog_list_selected_items; // 已选中的列表项内容 (Selected list item contents)
+    std::unordered_set<size_t> dialog_list_selected_indices; // 已选中的列表项索引集合 (Set of selected list item indices)
 
     bool clean_button{false}; // 强制清理标签
     
@@ -283,6 +351,7 @@ private:
     CopyProgressInfo copy_progress{};           // 复制进度信息 (Copy progress info)
     std::mutex copy_progress_mutex;            // 复制进度互斥锁 (Copy progress mutex)
     util::AsyncFurture<bool> copy_task;        // 异步复制任务 (Async copy task)
+    util::AsyncFurture<bool> add_task;         // 异步添加MOD任务 (Async add MOD task)
     
     float FPS{0.0f}; // 当前帧率 (Current frame rate)
     
@@ -291,8 +360,20 @@ private:
     // 操作计时相关 (Operation timing related)
     std::chrono::milliseconds operation_duration{0}; // 操作耗时 (Operation duration)
 
-    // 教程界面相关 (Instruction interface related)
-    int instruction_current_page{0};  // 当前页码 (Current page number)
+    // 教程界面相关变量 (Instruction interface related variables)
+    int instruction_image_index{0}; // 当前显示的教程图片索引 (Current instruction image index)
+    
+    // 三角形透明度动画相关变量 (Triangle opacity animation related variables)
+    int triangle_alpha_animation{0};        // 三角形透明度动画状态：0=无动画，1=变亮，2=变暗 (Triangle opacity animation state: 0=no animation, 1=brighten, 2=darken)
+    bool triangle_animation_is_left{false}; // 动画方向：true=左侧三角形，false=右侧三角形 (Animation direction: true=left triangle, false=right triangle)
+    std::chrono::steady_clock::time_point triangle_animation_start_time; // 三角形动画开始时间 (Triangle animation start time)
+    static constexpr int TRIANGLE_ANIMATION_DURATION_MS = 100; // 动画持续时间（毫秒）(Animation duration in milliseconds)
+    
+    // 边界动画相关变量 (Boundary animation related variables)
+    int boundary_flash_animation{0};        // 边界闪烁动画状态：0=无动画，1=闪烁中 (Boundary flash animation state: 0=no animation, 1=flashing)
+    bool boundary_animation_is_left{false}; // 边界动画方向：true=左边界，false=右边界 (Boundary animation direction: true=left boundary, false=right boundary)
+    std::chrono::steady_clock::time_point boundary_animation_start_time; // 边界动画开始时间 (Boundary animation start time)
+    static constexpr int BOUNDARY_ANIMATION_DURATION_MS = 200; // 边界动画持续时间（毫秒）(Boundary animation duration in milliseconds)
 
     // 模组名称映射相关 (MOD name mapping related)
     std::unordered_map<std::string, ModNameInfo> mod_name_cache; // 缓存已加载的映射数据 (Cache for loaded mapping data)
@@ -311,17 +392,22 @@ private:
     void Poll();
 
     void Sort();
+    void Sort2(); // ADDGAMELIST界面专用的排序函数 (Dedicated sorting function for ADDGAMELIST interface)
     const char* GetSortStr();
+    void changegamename();
+    void changemodversion();
 
     void UpdateLoad();
     void UpdateList();
     void UpdateModList(); // 更新MOD列表界面 (Update MOD list interface)
     void UpdateInstruction(); // 更新教程界面 (Update instruction interface)
+    void UpdateAddGameList(); // 更新添加游戏列表界面 (Update add game list interface)
     void DrawBackground();
     void DrawLoad();
     void DrawList();
     void DrawModList(); // 绘制MOD列表界面 (Draw MOD list interface)
     void DrawInstruction(); // 绘制教程界面 (Draw instruction interface)
+    void DrawAddGameList(); 
     
     // 对话框相关函数 (Dialog related functions)
     /**
@@ -344,9 +430,21 @@ private:
     void HideDialog();
     void DrawDialog();
     void UpdateDialog();
+    void Dialog_Menu(); // 对话框菜单处理中心 (Dialog menu processing center)
+    void Dialog_LIST_Menu();// 主界面右侧菜单处理中心 (Main interface right menu processing center)
+    void Dialog_MODLIST_Menu();// MOD列表界面右侧菜单处理中心 (MOD list interface right menu processing center)
+    void Dialog_MODLIST_TYPE_Menu();// 修改类型界面右侧菜单处理中心 (MOD list interface right menu processing center)
+    void Dialog_APPENDMOD_Menu();// 追加模组界面右侧菜单处理中心 (MOD list interface right menu processing center)
+    void Dialog_ADDGAME_Menu();// 添加游戏界面右侧菜单处理中心 (MOD list interface right menu processing center)
+
+    void changemodname();
+    void changemoddescription();
+    
+    // LIST_SELECT对话框辅助函数 (LIST_SELECT dialog helper functions)
+    void ParseListSelectContent(const std::string& content); // 解析列表选择内容 (Parse list select content)
 
     // 模组名称映射相关函数 (MOD name mapping related functions)
-    bool LoadModNameMapping(const std::string& game_name, const std::string& FILE_PATH); // 加载指定游戏的模组名称映射 (Load MOD name mapping for specified game)
+    bool LoadModNameMapping(const std::string& FILE_PATH); // 加载指定游戏的模组名称映射 (Load MOD name mapping for specified game)
     std::string GetMappedModName(const std::string& original_name, const std::string& mod_type); // 获取映射后的模组名称 (Get mapped MOD name)
     std::string GetModDescription(const std::string& original_name, const std::string& mod_type); // 获取模组描述 (Get MOD description)
     void ClearModNameCache(); // 清空映射缓存 (Clear mapping cache)
@@ -355,6 +453,7 @@ private:
     bool LoadGameNameMapping(); // 加载游戏名称映射 (Load game name mapping)
     std::string GetMappedGameName(const std::string& original_name, const std::string& mod_version); // 获取映射后的游戏名称 (Get mapped game name)
     void ClearGameNameCache(); // 清空游戏名称映射缓存 (Clear game name mapping cache)
+    void clearaddgamelist(); // 清理AddGame界面的所有资源和状态 (Clear all AddGame interface resources and states)
 
     // 字符串格式化辅助函数声明 (String formatting helper function declarations)
     std::string GetSnprintf(const std::string& format_str, const std::string& value);
@@ -370,13 +469,12 @@ private:
     int ModInstalled(); // 安装选中的MOD到atmosphere目录 (Install selected MOD to atmosphere directory)
     int ModUninstalled(); // 卸载选中的MOD从atmosphere目录 (Uninstall selected MOD from atmosphere directory)
     
+    // 文件系统辅助函数 (Filesystem helper functions)
+    bool CheckMods2Path(); // 检查并创建mods2文件夹结构 (Check and create mods2 folder structure)
+    std::string appendmodscan(); // 扫描add-mod文件夹中的ZIP文件并返回管道符分隔的字符串 (Scan ZIP files in add-mod folder and return pipe-separated string)
     
-
-
-   
     
-    
-
+    std::string GetFirstCharPinyin(const std::string& chinese_text); // 获取首字符拼音的辅助函数 (Helper function to get first character pinyin)
 
 private: // from nanovg decko3d example by adubbz
     static constexpr unsigned NumFramebuffers = 2;

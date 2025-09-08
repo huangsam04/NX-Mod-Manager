@@ -65,12 +65,21 @@ void drawRect(NVGcontext*, float x, float y, float w, float h, const NVGcolor&& 
 void drawRect(NVGcontext*, float x, float y, float w, float h, const NVGpaint& p);
 void drawRect(NVGcontext*, float x, float y, float w, float h, const NVGpaint&& p);
 
+// 绘制圆角矩形 (Draw rounded rectangle)
+void drawRoundedRect(NVGcontext*, float x, float y, float w, float h, float r, int red, int green, int blue);
+
+// 绘制可变圆角矩形 (Draw rounded rectangle with varying corners)
+void drawRoundedRectVarying(NVGcontext*, float x, float y, float w, float h, float radiusTopLeft, float radiusTopRight, float radiusBottomRight, float radiusBottomLeft, int red, int green, int blue);
+
 void drawText(NVGcontext*, float x, float y, float size, const char* str, const char* end, int align, Colour c);
 void drawText(NVGcontext*, float x, float y, float size, const char* str, const char* end, int align, const NVGcolor& c);
 void drawText(NVGcontext*, float x, float y, float size, const char* str, const char* end, int align, const NVGcolor&& c);
 void drawTextArgs(NVGcontext*, float x, float y, float size, int align, Colour c, const char* str, ...);
 
 void drawButton(NVGcontext* vg, float x, float y, float size, Button button);
+
+// 绘制包含按钮标记的文本（如[PLUS]）
+void drawTextWithButtonMarker(NVGcontext* vg, float x, float y, float size, const char* str, const char* end, int align, Colour c);
 
 const char* getButton(Button button);
 

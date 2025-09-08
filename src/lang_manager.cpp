@@ -43,32 +43,6 @@ std::string COSMETIC_TEXT;
 std::string NONE_TEXT;
 std::string PLAY_TEXT;
 
-// 说明文本 (Instruction texts)
-std::string INSTRUCTION_LINE_1;
-std::string INSTRUCTION_LINE_2;
-std::string INSTRUCTION_LINE_3;
-std::string INSTRUCTION_LINE_4;
-std::string INSTRUCTION_LINE_5;
-std::string INSTRUCTION_LINE_6;
-std::string INSTRUCTION_LINE_7;
-std::string INSTRUCTION_LINE_8;
-std::string INSTRUCTION_LINE_9;
-std::string INSTRUCTION_LINE_10;
-std::string INSTRUCTION_LINE_11;
-std::string INSTRUCTION_LINE_12;
-std::string INSTRUCTION_LINE_13;
-std::string INSTRUCTION_LINE_14;
-std::string INSTRUCTION_LINE_15;
-std::string INSTRUCTION_LINE_16;
-std::string INSTRUCTION_LINE_17;
-std::string INSTRUCTION_LINE_18;
-std::string INSTRUCTION_LINE_19;
-std::string INSTRUCTION_LINE_20;
-std::string INSTRUCTION_LINE_21;
-std::string INSTRUCTION_LINE_22;
-std::string INSTRUCTION_LINE_23;
-std::string INSTRUCTION_LINE_24;
-
 
 std::string CONFIRM_INSTALLED;
 std::string CONFIRM_UNINSTALLED;
@@ -95,6 +69,31 @@ std::string CANT_READ_ERROR;
 std::string CANT_CREATE_ERROR;
 std::string CANT_WRITE_ERROR;
 std::string Aggregating_Files;
+
+std::string Add_Mod_BUTTON;
+std::string Game_VERSION_TAG;
+std::string MOD_VERSION_TAG;
+std::string MOD_COUNT_TAG;
+std::string OPTION_BUTTON;
+std::string LIST_OPTION_TEXT;
+std::string MODLIST_OPTION_TEXT;
+std::string NAME_INPUT_TEXT;
+std::string MOD_DESCRIPTION_TEXT;
+std::string MODTYPE_OPTION_TEXT;
+std::string MOD_VERSION_INPUT_TEXT;
+std::string BUTTON_CANCEL;
+std::string OPTION_MEMU_TITLE;
+std::string OPTION_MODTYPE_MEMU_TITLE;
+std::string OPTION_APPENDMOD_MEMU_TITLE;
+std::string ADDING_MOD_TEXT;
+std::string ADD_MOD_DONE_TEXT;
+std::string ADD_MOD_STOP_TEXT;
+std::string VERSION_TAG;
+std::string CREATE_GAME_DIR_ERROR;
+std::string CREATE_GAME_ID_DIR_ERROR;
+std::string UNKNOWN_ERROR;
+std::string READD_ERROR;
+std::string NO_FOUND_MOD_ERROR;
 
 namespace tj {
 
@@ -306,31 +305,6 @@ bool LangManager::loadLanguage(const std::string& langCode) {
             {"COSMETIC_TEXT", std::ref(COSMETIC_TEXT)},
             {"NONE_TEXT", std::ref(NONE_TEXT)},
             {"PLAY_TEXT", std::ref(PLAY_TEXT)},
-            {"INSTRUCTION_LINE_1", std::ref(INSTRUCTION_LINE_1)},
-            {"INSTRUCTION_LINE_2", std::ref(INSTRUCTION_LINE_2)},
-            {"INSTRUCTION_LINE_3", std::ref(INSTRUCTION_LINE_3)},
-            {"INSTRUCTION_LINE_4", std::ref(INSTRUCTION_LINE_4)},
-            {"INSTRUCTION_LINE_5", std::ref(INSTRUCTION_LINE_5)},
-            {"INSTRUCTION_LINE_6", std::ref(INSTRUCTION_LINE_6)},
-            {"INSTRUCTION_LINE_7", std::ref(INSTRUCTION_LINE_7)},
-            {"INSTRUCTION_LINE_8", std::ref(INSTRUCTION_LINE_8)},
-            {"INSTRUCTION_LINE_9", std::ref(INSTRUCTION_LINE_9)},
-            {"INSTRUCTION_LINE_10", std::ref(INSTRUCTION_LINE_10)},
-            {"INSTRUCTION_LINE_11", std::ref(INSTRUCTION_LINE_11)},
-            {"INSTRUCTION_LINE_12", std::ref(INSTRUCTION_LINE_12)},
-            {"INSTRUCTION_LINE_13", std::ref(INSTRUCTION_LINE_13)},
-            {"INSTRUCTION_LINE_14", std::ref(INSTRUCTION_LINE_14)},
-            {"INSTRUCTION_LINE_15", std::ref(INSTRUCTION_LINE_15)},
-            {"INSTRUCTION_LINE_16", std::ref(INSTRUCTION_LINE_16)},
-            {"INSTRUCTION_LINE_17", std::ref(INSTRUCTION_LINE_17)},
-            {"INSTRUCTION_LINE_18", std::ref(INSTRUCTION_LINE_18)},
-            {"INSTRUCTION_LINE_19", std::ref(INSTRUCTION_LINE_19)},
-            {"INSTRUCTION_LINE_20", std::ref(INSTRUCTION_LINE_20)},
-            {"INSTRUCTION_LINE_21", std::ref(INSTRUCTION_LINE_21)},
-            {"INSTRUCTION_LINE_22", std::ref(INSTRUCTION_LINE_22)},
-            {"INSTRUCTION_LINE_23", std::ref(INSTRUCTION_LINE_23)},
-            {"INSTRUCTION_LINE_24", std::ref(INSTRUCTION_LINE_24)},
-
             
             {"CONFIRM_INSTALLED", std::ref(CONFIRM_INSTALLED)},
             {"CONFIRM_UNINSTALLED", std::ref(CONFIRM_UNINSTALLED)},
@@ -357,6 +331,30 @@ bool LangManager::loadLanguage(const std::string& langCode) {
             {"CANT_CREATE_ERROR", std::ref(CANT_CREATE_ERROR)},
             {"CANT_WRITE_ERROR", std::ref(CANT_WRITE_ERROR)},
             {"Aggregating_Files", std::ref(Aggregating_Files)},
+            {"Add_Mod_BUTTON", std::ref(Add_Mod_BUTTON)},
+            {"Game_VERSION_TAG", std::ref(Game_VERSION_TAG)},
+            {"MOD_VERSION_TAG", std::ref(MOD_VERSION_TAG)},
+            {"MOD_COUNT_TAG", std::ref(MOD_COUNT_TAG)},
+            {"OPTION_BUTTON", std::ref(OPTION_BUTTON)},
+            {"LIST_OPTION_TEXT", std::ref(LIST_OPTION_TEXT)},
+            {"MODLIST_OPTION_TEXT", std::ref(MODLIST_OPTION_TEXT)},
+            {"NAME_INPUT_TEXT", std::ref(NAME_INPUT_TEXT)},
+            {"MOD_DESCRIPTION_TEXT", std::ref(MOD_DESCRIPTION_TEXT)},
+            {"MODTYPE_OPTION_TEXT", std::ref(MODTYPE_OPTION_TEXT)},
+            {"MOD_VERSION_INPUT_TEXT", std::ref(MOD_VERSION_INPUT_TEXT)},
+            {"BUTTON_CANCEL", std::ref(BUTTON_CANCEL)},
+            {"OPTION_MEMU_TITLE", std::ref(OPTION_MEMU_TITLE)},
+            {"OPTION_MODTYPE_MEMU_TITLE", std::ref(OPTION_MODTYPE_MEMU_TITLE)},
+            {"OPTION_APPENDMOD_MEMU_TITLE", std::ref(OPTION_APPENDMOD_MEMU_TITLE)},
+            {"ADDING_MOD_TEXT", std::ref(ADDING_MOD_TEXT)},
+            {"ADD_MOD_DONE_TEXT", std::ref(ADD_MOD_DONE_TEXT)},
+            {"ADD_MOD_STOP_TEXT", std::ref(ADD_MOD_STOP_TEXT)},
+            {"VERSION_TAG", std::ref(VERSION_TAG)},
+            {"CREATE_GAME_DIR_ERROR", std::ref(CREATE_GAME_DIR_ERROR)},
+            {"CREATE_GAME_ID_DIR_ERROR", std::ref(CREATE_GAME_ID_DIR_ERROR)},
+            {"UNKNOWN_ERROR", std::ref(UNKNOWN_ERROR)},
+            {"READD_ERROR", std::ref(READD_ERROR)},
+            {"NO_FOUND_MOD_ERROR", std::ref(NO_FOUND_MOD_ERROR)},
         };
 
         // 遍历映射表进行赋值 - 修改为更兼容的遍历方式
