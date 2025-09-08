@@ -8,6 +8,9 @@ The plugin supports local data caching, and for 20+ systems, except for the slow
 
 ## Installation Speed
 
+**Note**: Starting from version 2.0, this plugin only supports installing ZIP-type MODs. Manual installation methods are not affected.
+**Note**: File installation functionality will not be deleted, just no longer updated and maintained.
+
 **Note**: The first level inside the ZIP package must be `contents` and `exefs_patches`, otherwise it cannot be recognized. The name of the ZIP package does not matter.
 **Note**: ZIP compression should use standard format. Only ZIP format is supported, 7z\RAR formats are not supported.
 
@@ -25,7 +28,17 @@ ZIP-based installation time: 4 minutes 50 seconds - 5 minutes 03 seconds, uninst
 
 ## Usage
 
-Download the plugin, configure the MOD as per the tutorial below, and place it in the `mods2` folder on the SD card. If the folder does not exist, create one.
+After downloading and running the plugin, it will automatically create a mods2 folder for storing MODs. It will also automatically create a /mods2/0000-add-mod-0000 folder for placing ZIP-type MODs to be installed.
+
+Place ZIP-type MODs into the /mods2/0000-add-mod-0000 folder, open the plugin, and follow the function prompts for normal use.
+
+**Note**: The newly added plugin installation function only supports ZIP-type MODs.
+
+**Note**: ZIP names can only contain English letters and numbers.
+
+**Note**: The first level inside the ZIP package must be `contents` and `exefs_patches`, otherwise it cannot be recognized.
+
+For more complex but faster batch installation manual configuration methods, see the tutorial below.
 
 ## Interface Screenshots
 
@@ -39,6 +52,9 @@ Download the plugin, configure the MOD as per the tutorial below, and place it i
 
 ![Application Interface 5](images/5.jpg)
 
+![Application Interface 6](images/6.jpg)
+
+![Application Interface 7](images/7.jpg)
 
 
 ### Complete Directory Structure

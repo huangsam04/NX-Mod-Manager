@@ -35,16 +35,65 @@
 "COSMETIC_TEXT": "Mod cosmétique. Embellit le contenu du jeu après installation.",
 "NONE_TEXT": "Ce mod n'a pas de tag. Ajoutez un tag [Type] à la fin du nom du mod.\nPour plus de détails, appuyez sur START dans le menu principal.",
 "PLAY_TEXT": "Mod de gameplay étendu. Améliore le gameplay après installation.",
-"INSTRUCTION_LINE_1": "・Répertoire d'utilisation des Mods: Carte SD \\ mods2",
-"INSTRUCTION_LINE_2": "・Chemin du Mod: mods2 \\ Nom du Jeu [Tag Ver] \\ ID du Jeu \\ Nom du Mod [Tag Type] \\ Fichiers",
-"INSTRUCTION_LINE_3": "・Plusieurs mods sous le chemin de l'ID du Jeu, ex., Mod1 [Type], Mod2 [Type].",
-"INSTRUCTION_LINE_4": "・Voici un exemple de mod exefs_patches:",
-"INSTRUCTION_LINE_5": "   Sentinels [1.0.0]\\0100...000\\cheat code[C]\\contents\\0100...000\\cheats\\F64F574.txt",
-"INSTRUCTION_LINE_6": "・Voici un exemple de mod exefs_patches:",
-"INSTRUCTION_LINE_7": "   Bayonetta [1.2.0]\\0100...000\\720&900 [G]\\exefs_patches\\Bayo3\\F00DF.ips",
-"INSTRUCTION_LINE_8": "・Format du tag: [X] (X=tag). Évitez [] dans le contenu du chemin non-tag pour éviter les erreurs.",
-"INSTRUCTION_LINE_9": "・Tag de version du mod: Entrez la version réelle (chiffres seulement). Ex., V1.2.0 → [1.2.0].",
-"INSTRUCTION_LINE_10": "・5 tags de mod au total: [F]:FPS, [G]:Graphiques, [B]:Cosmétique, [P]:Gameplay, [C]:Triches.",
-"INSTRUCTION_LINE_11": "・système fichiers ne supporte pas chinois ; utilisez anglais, chiffres, ponctuation seulement, sinon non reconnu.",
-"INSTRUCTION_LINE_12": "・L'absence de tags dans le chemin n'affecte pas l'utilisation, mais est recommandée pour une meilleure gestion."
+"CONFIRM_INSTALLED": "Confirmer l'installation de [%s]?",
+"CONFIRM_UNINSTALLED": "Confirmer la désinstallation de [%s]?",
+"SUCCESS_INSTALLED": "[%s] installé avec succès!",
+"SUCCESS_UNINSTALLED": "[%s] désinstallé avec succès!",
+"FAILURE_INSTALLED": "[%s] échec de l'installation!",
+"FAILURE_UNINSTALLED": "[%s] échec de la désinstallation!",
+"CANCEL_INSTALLED": "Installation de [%s] annulée!",
+"CANCEL_UNINSTALLED": "Désinstallation de [%s] annulée!",
+"CANT_OPEN_FILE": "Impossible d'ouvrir le répertoire source!\n",
+"CANT_CREATE_DIR": "Impossible de créer le répertoire cible!\n",
+"INSTALLEDING_TEXT": "Installation en cours",
+"UNINSTALLEDING_TEXT": "Désinstallation en cours",
+"CALCULATE_FILES": "Comptage des fichiers...",
+"COPY_ERROR": "Erreur lors de l'installation!",
+"UNINSTALLED_ERROR": "Erreur lors de la désinstallation!",
+"CLEAR_BUTTON": "Nettoyer les résidus",
+"FILE_NONE": "La structure du module %s est incorrecte, veuillez vérifier!",
+"DNOT_READY": "Opération trop rapide, non encore prête!",
+"ZIP_OPEN_ERROR": "Impossible d'ouvrir le fichier ZIP!\n",
+"ZIP_READ_ERROR": "Impossible de lire le fichier ZIP!\n",
+"CANT_READ_ERROR": "Impossible de lire le fichier !\n",
+"CANT_CREATE_ERROR": "Impossible de créer le fichier!\n",
+"CANT_WRITE_ERROR": "Impossible d'écrire dans le fichier !\n",
+"Aggregating_Files": "Agrégation des fichiers...",
+"Add_Mod_BUTTON": "Ajouter un jeu",
+"BUTTON_CANCEL": "Annuler",
+"Game_VERSION_TAG": "Jeu :",
+"VERSION_TAG": "Version :",
+"MOD_VERSION_TAG": "Mod :",
+"MOD_COUNT_TAG": "Quantité :",
+"OPTION_BUTTON": "Options",
+"LIST_OPTION_TEXT": "Nom personnalisé|Modifier version|Ajouter jeu|À propos de l’auteur",
+"MODLIST_OPTION_TEXT": "Nom personnalisé|Modifier type|Modifier description|Ajouter mod",
+"MODTYPE_OPTION_TEXT": "Correctif FPS|Amélioration graphique|Embellissement du jeu|Plus de gameplay|Codes de triche",
+"NAME_INPUT_TEXT": "<Entrez un nom personnalisé>",
+"MOD_DESCRIPTION_TEXT": "<Entrez la description du mod>",
+"MOD_VERSION_INPUT_TEXT": "<Entrez la version du mod>",
+"OPTION_MEMU_TITLE": "Menu des paramètres",
+"OPTION_MODTYPE_MEMU_TITLE": "Choisir le type de mod",
+"OPTION_APPENDMOD_MEMU_TITLE": "Sélectionnez puis appuyez sur [PLUS] pour ajouter",
+"ADDING_MOD_TEXT": "Ajout du mod en cours",
+"ADD_MOD_DONE_TEXT": " Mod ajouté avec succès,\nTemps total ",
+"ADD_MOD_STOP_TEXT": "Ajout du mod interrompu !\nTotal ajouté",
+"CREATE_GAME_DIR_ERROR": "Échec de création du dossier du jeu",
+"CREATE_GAME_ID_DIR_ERROR": "Échec de création du dossier ID du jeu",
+"UNKNOWN_ERROR": "Erreur inconnue !",
+"READD_ERROR": "Ce jeu a déjà été ajouté, ne pas l’ajouter à nouveau !",
+"NO_FOUND_MOD_ERROR": "Aucun mod disponible,\najoutez-le correctement en suivant le guide !"
+
+
+
+
+
+
+
+
+
+
+
+
+
 }

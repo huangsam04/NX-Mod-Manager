@@ -40,9 +40,9 @@ include $(DEVKITPRO)/libnx/switch_rules
 #   BBBBBBBBBBBBBBB             424242424242424242424242424242
 #   模组管理器                   E6A8A1E7BB84E7AEA1E79086E599A8
 
-APP_TITLE	:= BBBBBBBBBBBBBBB
+APP_TITLE	:= NX-Mod-Manager
 APP_AUTHOR	:= Tom
-APP_VERSION	:= "1.2.0"
+APP_VERSION	:= "2.0.0"
 ICON		:= assets/icon.jpg
 
 TARGET		:=	NX-Mod-Manager
