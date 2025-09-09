@@ -2282,10 +2282,12 @@ std::string App::SanitizeGameNameForPath(const std::string& game_name) {
 // Fast get application basic info and cache icon data
 bool App::TryGetAppBasicInfoWithIconCache(u64 application_id, AppEntry& entry) {
     
+    u32 version_32 = getgameversioninfo(application_id);
+
     // 1. 优先尝试从缓存获取应用名称
     // 1. Try to get application name from cache first
     NxTitleCacheApplicationMetadata* cached_metadata = nxtcGetApplicationMetadataEntryById(application_id);
-    if (cached_metadata != nullptr) {
+    if (cached_metadata != nullptr && version_32 == cached_metadata->version_info) {
         entry.name = cached_metadata->name;
         entry.id = cached_metadata->title_id;
         entry.display_version = cached_metadata->version; 
@@ -2349,9 +2351,9 @@ bool App::TryGetAppBasicInfoWithIconCache(u64 application_id, AppEntry& entry) {
         memcpy(entry.cached_icon_data.data(), control_data->icon, icon_size);
         entry.has_cached_icon = true;
         
-        // 仍然添加到缓存系统以供其他用途
-        // Still add to cache system for other uses
-        nxtcAddEntry(application_id, &control_data->nacp, icon_size, control_data->icon, true);
+        // 仍然添加到缓存系统以供其他用途，并传递版本信息
+        // Still add to cache system for other uses, and pass version info
+        nxtcAddEntry(application_id, &control_data->nacp, icon_size, control_data->icon, true, version_32);
     } else {
         entry.has_cached_icon = false;
     }
@@ -2362,11 +2364,13 @@ bool App::TryGetAppBasicInfoWithIconCache(u64 application_id, AppEntry& entry) {
 // 专用于AddGame界面的应用信息获取函数
 // Dedicated app info function for AddGame interface
 bool App::TryGetAppBasicInfoWithIconCacheForAddGame(u64 application_id, AppEntry_AddGame& entry) {
-    
+
+    u32 version_32 = getgameversioninfo(application_id);
+
     // 2. entries中不存在，优先尝试从缓存获取应用名称
     // 2. Not found in entries, try to get application name from cache first
     NxTitleCacheApplicationMetadata* cached_metadata = nxtcGetApplicationMetadataEntryById(application_id);
-    if (cached_metadata != nullptr) {
+    if (cached_metadata != nullptr && version_32 == cached_metadata->version_info) {
         entry.name = cached_metadata->name;
         entry.id = cached_metadata->title_id;
         entry.display_version = cached_metadata->version; 
@@ -2432,7 +2436,7 @@ bool App::TryGetAppBasicInfoWithIconCacheForAddGame(u64 application_id, AppEntry
         
         // 仍然添加到缓存系统以供其他用途
         // Still add to cache system for other uses
-        nxtcAddEntry(application_id, &control_data->nacp, icon_size, control_data->icon, true);
+        nxtcAddEntry(application_id, &control_data->nacp, icon_size, control_data->icon, true, version_32);
     } else {
         entry.has_cached_icon = false;
     }
@@ -2907,7 +2911,30 @@ void App::FastScanNames(std::stop_token stop_token) {
 
     // 初始化libnxtc库
     if (!nxtcInitialize()) {
-        LOG("初始化libnxtc库失败\n");
+
+        // 标记扫描结束
+        is_scan_running = false;
+
+        // 标记扫描完成
+        this->finished_scanning = true;
+        
+    }
+
+    Result rc = avmInitialize();
+    if (R_FAILED(rc)) {
+
+        // 标记扫描结束
+        is_scan_running = false;
+
+        // 刷新缓存文件
+        nxtcFlushCacheFile();
+
+        // 退出libnxtc库
+        nxtcExit();
+
+        // 标记扫描完成
+        this->finished_scanning = true;
+
     }
 
     // SD卡会自动挂载，直接使用标准路径
@@ -2925,6 +2952,8 @@ void App::FastScanNames(std::stop_token stop_token) {
     while ((filename_entry = readdir(mods_dir)) != nullptr) {
         if (stop_token.stop_requested()) {
             closedir(mods_dir);
+            avmExit();
+            nxtcExit();
             break;
         }
         
@@ -3104,6 +3133,8 @@ done:
     // 退出libnxtc库
     nxtcExit();
 
+    avmExit();
+
     // 加锁保护finished_scanning
     std::scoped_lock lock{this->mutex};
 
@@ -3140,12 +3171,20 @@ void App::FastScanAllGames(std::stop_token stop_token) {
         return; // 初始化失败，直接返回 (Failed to initialize, return directly)
     }
 
+    Result rc = avmInitialize();
+    if (R_FAILED(rc)) {
+        addgame_scan_running = false;
+        return; // AVM服务初始化失败，直接返回 (AVM service initialization failed, return directly)
+    }
+
     size_t count = 0;
     
     // 遍历所有应用ID
     // Iterate through all application IDs
     for (u64 application_id : app_ids) {
         if (stop_token.stop_requested()) {
+            avmExit();
+            nxtcExit();
             break; // 如果请求停止，退出循环 (If stop requested, exit loop)
         }
 
@@ -3251,7 +3290,7 @@ void App::FastScanAllGames(std::stop_token stop_token) {
     // 退出libnxtc库
     // Exit libnxtc library
     nxtcExit();
-    
+    avmExit();
     // 标记ADDGAMELIST扫描完成
     // Mark ADDGAMELIST scanning complete
     addgame_scan_running = false;
@@ -6306,6 +6345,22 @@ std::string App::appendmodscan() {
     return result; // 返回管道符分隔的ZIP文件名字符串 (Return pipe-separated ZIP file names string)
 }
 
+// 获取游戏版本ID函数 (Get game version ID function)
+// 根据传入的应用ID获取对应的版本ID (Get corresponding version ID based on input application ID)
+u32 App::getgameversioninfo(u64 application_id) {
+    
+    // 获取应用版本信息 (Get application version info)
+    AvmVersionListEntry version_entry;
+    Result result = avmGetVersionListEntry(application_id, &version_entry);
+    
+    if (R_SUCCEEDED(result)) {
+        // 成功获取版本信息 (Successfully obtained version info)
+        return version_entry.version;
+    }
+    
+    // 获取失败时返回一个绝对不可能的版本号 (Return an impossible version number when failed)
+    return 0xFFFFFFFE;
+}
 
 
 } // namespace tj

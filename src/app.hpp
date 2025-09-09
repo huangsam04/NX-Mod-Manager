@@ -476,6 +476,8 @@ private:
     
     
     std::string GetFirstCharPinyin(const std::string& chinese_text); // 获取首字符拼音的辅助函数 (Helper function to get first character pinyin)
+    
+    u32 getgameversioninfo(u64 application_id);
 
 private: // from nanovg decko3d example by adubbz
     static constexpr unsigned NumFramebuffers = 2;
