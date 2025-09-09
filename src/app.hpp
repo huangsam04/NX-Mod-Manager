@@ -185,6 +185,7 @@ private:
     bool TryGetAppBasicInfoWithIconCache(u64 application_id, AppEntry& entry);
     bool TryGetAppBasicInfoWithIconCacheForAddGame(u64 application_id, AppEntry_AddGame& entry); // 专用于AddGame界面的应用信息获取函数 (Dedicated app info function for AddGame interface)
     std::string TryGetAppEnglishName(u64 application_id);
+    std::string SanitizeGameNameForPath(const std::string& game_name); // 清理游戏名中的路径敏感字符 (Clean path-sensitive characters in game name)
     
     Result GetAllApplicationIds(std::vector<u64>& app_ids);
     

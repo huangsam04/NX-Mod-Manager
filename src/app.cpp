@@ -2246,7 +2246,7 @@ std::string App::TryGetAppEnglishName(u64 application_id){
         // 检查英文名称是否存在且不为空
         // Check if English name exists and is not empty
         if (english_entry->name[0] != '\0') {
-            return std::string(english_entry->name);
+            return SanitizeGameNameForPath(std::string(english_entry->name));
         }
     }
     
@@ -2255,6 +2255,23 @@ std::string App::TryGetAppEnglishName(u64 application_id){
     char app_id_buffer[17]; // 16位十六进制字符串 + 结束符 (16-digit hex string + null terminator)
     snprintf(app_id_buffer, sizeof(app_id_buffer), "%016lX", application_id);
     return std::string(app_id_buffer);
+}
+
+// 清理游戏名中的路径敏感字符 (Clean path-sensitive characters in game name)
+std::string App::SanitizeGameNameForPath(const std::string& game_name) {
+    std::string sanitized = game_name;
+    
+    // 定义需要替换的敏感字符 (Define sensitive characters to replace)
+    const std::string sensitive_chars = "<>:\"/|?*";
+    
+    // 将敏感字符替换为空格 (Replace sensitive characters with spaces)
+    for (char& c : sanitized) {
+        if (sensitive_chars.find(c) != std::string::npos) {
+            c = ' ';
+        }
+    }
+    
+    return sanitized;
 }
 
 
