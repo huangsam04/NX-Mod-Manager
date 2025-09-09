@@ -4801,9 +4801,15 @@ void App::Dialog_ADDGAME_Menu() {
         // 加锁保护entries列表
         {
             std::scoped_lock lock{entries_mutex};
-            // 将应用条目添加到列表
-            this->entries.emplace_back(std::move(app_entry));
+            // 将应用条目添加到列表最前面
+            this->entries.emplace(this->entries.begin(), std::move(app_entry));
         }
+
+        // 重置主界面光标和页面位置，让用户返回桌面时能看到新添加的游戏 (Reset main interface cursor and page position so user can see newly added game when returning to desktop)
+        this->index = 0;        // 重置光标到第一个位置 (Reset cursor to first position)
+        this->start = 0;        // 重置显示起始索引 (Reset display start index)
+        this->yoff = 130.f;     // 重置Y坐标偏移量 (Reset Y coordinate offset)
+        this->ypos = 130.f;     // 重置Y坐标位置 (Reset Y coordinate position)
         
         // 直接为新添加的游戏加载图标，避免重新加载所有图标 (Load icon for newly added game directly, avoid reloading all icons)
         if (app_entry.display_version != NONE_GAME_TEXT && app_entry.has_cached_icon) {

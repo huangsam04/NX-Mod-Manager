@@ -23,6 +23,9 @@ namespace KeyboardHelper {
             return "";
         }
         
+        // 使用预设默认配置，自动处理主题兼容性和背景模糊
+        swkbdConfigMakePresetDefault(&kbd);
+        
         swkbdConfigSetType(&kbd, SwkbdType_All);
         swkbdConfigSetStringLenMax(&kbd, maxLen);
         
@@ -49,6 +52,9 @@ namespace KeyboardHelper {
         if (R_FAILED(swkbdCreate(&kbd, 0))) {
             return "";
         }
+        
+        // 使用预设默认配置，自动处理主题兼容性和背景模糊
+        swkbdConfigMakePresetDefault(&kbd);
         
         swkbdConfigSetType(&kbd, SwkbdType_NumPad);  // 直接使用数字键盘
         swkbdConfigSetStringLenMax(&kbd, maxLen);
