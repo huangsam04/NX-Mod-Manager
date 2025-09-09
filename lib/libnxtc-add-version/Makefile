@@ -141,7 +141,6 @@ dist-bin: example
 clean:
 	@echo clean ...
 	@rm -fr release debug lib *.bz2
-	@$(MAKE) --no-print-directory -C example clean
 
 dist-src:
 	@tar --exclude=*~ -cjf lib$(TARGET)_$(LIB_VERSION)-src.tar.bz2 \

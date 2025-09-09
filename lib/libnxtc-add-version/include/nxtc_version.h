@@ -28,6 +28,7 @@ typedef struct {
     char *name;         ///< NULL-terminated UTF-8 title name string in the system language.
     char *publisher;    ///< NULL-terminated UTF-8 title publisher string in the system language.
     char *version;      ///< NULL-terminated UTF-8 version string in the system language.
+    u32 version_info;   ///< 数值版本信息，用于版本比较和排序 / Numeric version info for version comparison and sorting.
     size_t icon_size;   ///< JPEG icon size.
     void *icon_data;    ///< JPEG icon data.
 } NxTitleCacheApplicationMetadata;
@@ -53,7 +54,7 @@ NxTitleCacheApplicationMetadata *nxtcGetApplicationMetadataEntryById(u64 title_i
 /// The size for the provided icon must never exceed 0x20000 bytes.
 /// Returns true if the new entry has been successfully added, or if the title ID already exists within the internal title cache (unless `force_add` is set to true).
 /// Returns false if an error occurs.
-bool nxtcAddEntry(u64 title_id, const NacpStruct *nacp, size_t icon_size, const void *icon_data, bool force_add);
+bool nxtcAddEntry(u64 title_id, const NacpStruct *nacp, size_t icon_size, const void *icon_data, bool force_add, u32 version_info);
 
 /// Populates the provided SetLanguage element with a value that represents the language being used by the cache (which should match the system language at all times).
 /// Returns false if an error occurs.
