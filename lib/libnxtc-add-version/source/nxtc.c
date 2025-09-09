@@ -9,7 +9,7 @@
 #include "nxtc_utils.h"
 
 #define TITLE_CACHE_MAGIC       0x4E585443  /* "NXTC". */
-#define TITLE_CACHE_VERSION     1
+#define TITLE_CACHE_VERSION     1           /* 保持版本1以避免兼容性问题 / Keep version 1 to avoid compatibility issues */
 #define TITLE_CACHE_ALIGNMENT   0x10
 
 #define TITLE_CACHE_FILE_NAME   "nxtc_version.bin"
@@ -35,6 +35,8 @@ typedef struct {
     u16 name_len;
     u16 publisher_len;
     u16 version_len;
+    u16 reserved;       ///< 保留字段用于对齐 / Reserved field for alignment.
+    u32 version_info;   ///< 数值版本信息 / Numeric version info.
     u32 icon_size;      ///< JPEG icon size. Must not exceed NACP_MAX_ICON_SIZE.
     u32 blob_offset;    ///< Relative to the start of the blob area. Must be aligned to TITLE_CACHE_ALIGNMENT.
     u32 blob_size;
@@ -42,7 +44,7 @@ typedef struct {
     u32 crc;            ///< Calculated over this entire struct with this field set to zero.
 } NxTitleCacheFileEntry;
 
-LIB_ASSERT(NxTitleCacheFileEntry, 0x28);
+LIB_ASSERT(NxTitleCacheFileEntry, 0x28);  // 更新为实际大小：8+2+2+2+2+4+4+4+4+4+4=40字节=0x28
 
 /* Function prototypes. */
 
@@ -61,10 +63,10 @@ static bool nxtcPopulateFileHeader(u8 *cache_file_data, size_t *out_cur_offset);
 static NxTitleCacheFileEntry *nxtcSerializeDataBlobs(u8 **cache_file_data, size_t *out_cur_offset);
 
 static NxTitleCacheApplicationMetadata *nxtcGenerateCacheEntryFromFileEntry(u8 *cache_file_data, const NxTitleCacheFileEntry *cache_file_entry, size_t *out_cur_offset);
-static NxTitleCacheApplicationMetadata *nxtcGenerateCacheEntryFromUserData(u64 title_id, const NacpLanguageEntry *lang_entry, const NacpStruct *nacp, size_t icon_size, const void *icon_data);
-static bool nxtcUpdateCacheEntryWithUserData(NxTitleCacheApplicationMetadata *cache_entry, const NacpLanguageEntry *lang_entry, const NacpStruct *nacp, size_t icon_size, const void *icon_data);
+static NxTitleCacheApplicationMetadata *nxtcGenerateCacheEntryFromUserData(u64 title_id, const NacpLanguageEntry *lang_entry, const NacpStruct *nacp, size_t icon_size, const void *icon_data, u32 version_info);
+static bool nxtcUpdateCacheEntryWithUserData(NxTitleCacheApplicationMetadata *cache_entry, const NacpLanguageEntry *lang_entry, const NacpStruct *nacp, size_t icon_size, const void *icon_data, u32 version_info);
 
-static void nxtcFillCacheEntryWithUserData(NxTitleCacheApplicationMetadata *cache_entry, const NacpLanguageEntry *lang_entry, const NacpStruct *nacp, size_t icon_size, const void *icon_data);
+static void nxtcFillCacheEntryWithUserData(NxTitleCacheApplicationMetadata *cache_entry, const NacpLanguageEntry *lang_entry, const NacpStruct *nacp, size_t icon_size, const void *icon_data, u32 version_info);
 
 static bool nxtcReallocateTitleCache(u32 extra_entry_count, bool free_entries);
 static void nxtcFreeTitleCache(bool flush);
@@ -230,6 +232,7 @@ NxTitleCacheApplicationMetadata *nxtcGetApplicationMetadataEntryById(u64 title_i
         out->name = strdup(cache_entry->name);
         out->publisher = strdup(cache_entry->publisher);
         out->version = strdup(cache_entry->version);
+        out->version_info = cache_entry->version_info;  // 复制版本信息字段
         out->icon_size = cache_entry->icon_size;
         out->icon_data = malloc(out->icon_size);
 
@@ -245,7 +248,7 @@ NxTitleCacheApplicationMetadata *nxtcGetApplicationMetadataEntryById(u64 title_i
     return out;
 }
 
-bool nxtcAddEntry(u64 title_id, const NacpStruct *nacp, size_t icon_size, const void *icon_data, bool force_add)
+bool nxtcAddEntry(u64 title_id, const NacpStruct *nacp, size_t icon_size, const void *icon_data, bool force_add, u32 version_info)
 {
     bool ret = false;
 
@@ -275,10 +278,10 @@ bool nxtcAddEntry(u64 title_id, const NacpStruct *nacp, size_t icon_size, const 
             }
 
             /* Update cache entry with the provided data. */
-            if (!nxtcUpdateCacheEntryWithUserData(cache_entry, lang_entry, nacp, icon_size, icon_data)) break;
+            if (!nxtcUpdateCacheEntryWithUserData(cache_entry, lang_entry, nacp, icon_size, icon_data, version_info)) break;
         } else {
             /* Generate title cache entry. */
-            cache_entry = nxtcGenerateCacheEntryFromUserData(title_id, lang_entry, nacp, icon_size, icon_data);
+            cache_entry = nxtcGenerateCacheEntryFromUserData(title_id, lang_entry, nacp, icon_size, icon_data, version_info);
             if (!cache_entry) break;
 
             /* Reallocate title cache entry pointer array. */
@@ -798,6 +801,9 @@ static NxTitleCacheApplicationMetadata *nxtcGenerateCacheEntryFromFileEntry(u8 *
     out->version = strndup((char*)data_blob + data_offset, cache_file_entry->version_len);
     data_offset += ALIGN_UP(cache_file_entry->version_len, TITLE_CACHE_ALIGNMENT);
 
+    /* 设置数值版本信息 / Set numeric version info */
+    out->version_info = cache_file_entry->version_info;
+
     out->icon_size = cache_file_entry->icon_size;
 
     out->icon_data = malloc(out->icon_size);
@@ -822,7 +828,7 @@ end:
     return out;
 }
 
-static NxTitleCacheApplicationMetadata *nxtcGenerateCacheEntryFromUserData(u64 title_id, const NacpLanguageEntry *lang_entry, const NacpStruct *nacp, size_t icon_size, const void *icon_data)
+static NxTitleCacheApplicationMetadata *nxtcGenerateCacheEntryFromUserData(u64 title_id, const NacpLanguageEntry *lang_entry, const NacpStruct *nacp, size_t icon_size, const void *icon_data, u32 version_info)
 {
     NxTitleCacheApplicationMetadata *out = NULL;
     bool success = false;
@@ -837,7 +843,7 @@ static NxTitleCacheApplicationMetadata *nxtcGenerateCacheEntryFromUserData(u64 t
 
     /* Fill title cache entry. */
     out->title_id = title_id;
-    nxtcFillCacheEntryWithUserData(out, lang_entry, nacp, icon_size, icon_data);
+    nxtcFillCacheEntryWithUserData(out, lang_entry, nacp, icon_size, icon_data, version_info);
 
     if (!out->name || !out->publisher || !out->version || !out->icon_data)
     {
@@ -854,7 +860,7 @@ end:
     return out;
 }
 
-static bool nxtcUpdateCacheEntryWithUserData(NxTitleCacheApplicationMetadata *cache_entry, const NacpLanguageEntry *lang_entry, const NacpStruct *nacp, size_t icon_size, const void *icon_data)
+static bool nxtcUpdateCacheEntryWithUserData(NxTitleCacheApplicationMetadata *cache_entry, const NacpLanguageEntry *lang_entry, const NacpStruct *nacp, size_t icon_size, const void *icon_data, u32 version_info)
 {
     NxTitleCacheApplicationMetadata bkp_cache_entry = {0};
 
@@ -862,7 +868,7 @@ static bool nxtcUpdateCacheEntryWithUserData(NxTitleCacheApplicationMetadata *ca
     memcpy(&bkp_cache_entry, cache_entry, sizeof(NxTitleCacheApplicationMetadata));
 
     /* Fill title cache entry. */
-    nxtcFillCacheEntryWithUserData(cache_entry, lang_entry, nacp, icon_size, icon_data);
+    nxtcFillCacheEntryWithUserData(cache_entry, lang_entry, nacp, icon_size, icon_data, version_info);
 
     if (!cache_entry->name || !cache_entry->publisher || !cache_entry->version || !cache_entry->icon_data)
     {
@@ -889,7 +895,7 @@ static bool nxtcUpdateCacheEntryWithUserData(NxTitleCacheApplicationMetadata *ca
     return true;
 }
 
-static void nxtcFillCacheEntryWithUserData(NxTitleCacheApplicationMetadata *cache_entry, const NacpLanguageEntry *lang_entry, const NacpStruct *nacp, size_t icon_size, const void *icon_data)
+static void nxtcFillCacheEntryWithUserData(NxTitleCacheApplicationMetadata *cache_entry, const NacpLanguageEntry *lang_entry, const NacpStruct *nacp, size_t icon_size, const void *icon_data, u32 version_info)
 {
     /* Duplicate title name and publisher strings. */
     if (lang_entry)
@@ -923,6 +929,9 @@ static void nxtcFillCacheEntryWithUserData(NxTitleCacheApplicationMetadata *cach
         cache_entry->publisher = strdup(g_curPlaceholderString);
         cache_entry->version = strdup(g_curPlaceholderString);
     }
+
+    /* 设置数值版本信息 / Set numeric version info */
+    cache_entry->version_info = version_info;  // 使用传入的版本信息 / Use the provided version info
 
     /* Duplicate icon data. */
     cache_entry->icon_size = (u32)icon_size;
@@ -1019,6 +1028,8 @@ static bool nxtcAppendDataBlobToFileCacheBuffer(u8 **cache_file_data, const NxTi
     cache_file_entry->name_len = (u16)strlen(cache_entry->name);
     cache_file_entry->publisher_len = (u16)strlen(cache_entry->publisher);
     cache_file_entry->version_len = (u16)strlen(cache_entry->version);
+    cache_file_entry->reserved = 0;  // 保留字段设为0 / Set reserved field to 0
+    cache_file_entry->version_info = cache_entry->version_info;  // 序列化数值版本信息 / Serialize numeric version info
     cache_file_entry->icon_size = cache_entry->icon_size;
     cache_file_entry->blob_offset = *out_blob_offset;
     cache_file_entry->blob_size = nxtcCalculateDataBlobSize(cache_file_entry->name_len, cache_file_entry->publisher_len, cache_file_entry->version_len, cache_file_entry->icon_size);
