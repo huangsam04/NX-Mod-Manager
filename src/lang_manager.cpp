@@ -6,6 +6,7 @@
 
 // 定义全局字符串变量
 // Global string variables
+
 std::string LOADING_TEXT;
 std::string BUTTON_BACK;
 std::string SOFTWARE_TITLE;
@@ -42,8 +43,6 @@ std::string CHEAT_TEXT;
 std::string COSMETIC_TEXT;
 std::string NONE_TEXT;
 std::string PLAY_TEXT;
-
-
 std::string CONFIRM_INSTALLED;
 std::string CONFIRM_UNINSTALLED;
 std::string SUCCESS_INSTALLED;
@@ -62,38 +61,93 @@ std::string UNINSTALLED_ERROR;
 std::string CLEAR_BUTTON;
 std::string FILE_NONE;
 std::string DNOT_READY;
-
 std::string ZIP_OPEN_ERROR;
 std::string ZIP_READ_ERROR;
 std::string CANT_READ_ERROR;
 std::string CANT_CREATE_ERROR;
 std::string CANT_WRITE_ERROR;
 std::string Aggregating_Files;
-
 std::string Add_Mod_BUTTON;
+std::string BUTTON_CANCEL;
 std::string Game_VERSION_TAG;
+std::string VERSION_TAG;
 std::string MOD_VERSION_TAG;
 std::string MOD_COUNT_TAG;
 std::string OPTION_BUTTON;
-std::string LIST_OPTION_TEXT;
-std::string MODLIST_OPTION_TEXT;
+std::string LIST_DIALOG_CUSTOM_NAME;
+std::string LIST_DIALOG_MODVERSION;
+std::string LIST_DIALOG_ADDGAME;
+std::string LIST_DIALOG_ViewDetails;
+std::string LIST_DIALOG_ABOUTAUTHOR;
+std::string LIST_DIALOG_MODTYPE;
+std::string LIST_DIALOG_MOD_DESCRIPTION;
+std::string LIST_DIALOG_APPENDMOD;
+std::string LIST_DIALOG_FPSPATCH;
+std::string LIST_DIALOG_HDPATCH;
+std::string LIST_DIALOG_COSMETICPATCH;
+std::string LIST_DIALOG_PLAYPATCH;
+std::string LIST_DIALOG_CHEATPATCH;
+std::string PRESS_B_STOP;
+std::string OK_BUTTON;
 std::string NAME_INPUT_TEXT;
 std::string MOD_DESCRIPTION_TEXT;
-std::string MODTYPE_OPTION_TEXT;
 std::string MOD_VERSION_INPUT_TEXT;
-std::string BUTTON_CANCEL;
 std::string OPTION_MEMU_TITLE;
 std::string OPTION_MODTYPE_MEMU_TITLE;
 std::string OPTION_APPENDMOD_MEMU_TITLE;
 std::string ADDING_MOD_TEXT;
 std::string ADD_MOD_DONE_TEXT;
 std::string ADD_MOD_STOP_TEXT;
-std::string VERSION_TAG;
 std::string CREATE_GAME_DIR_ERROR;
 std::string CREATE_GAME_ID_DIR_ERROR;
 std::string UNKNOWN_ERROR;
 std::string READD_ERROR;
 std::string NO_FOUND_MOD_ERROR;
+std::string SOFTWARE_TITLE_ADDGAME;
+std::string NO_FOUND_GAME;
+std::string WAIT_SCAN_TEXT;
+std::string IS_FAVORITE;
+std::string IS_NOT_FAVORITE;
+std::string LIST_DIALOG_REMOVE_MOD;
+std::string LIST_DIALOG_REMOVE_GAME;
+std::string CANNOT_REMOVE_INSTALLED_MOD;
+std::string REMOVE_LAST_MOD_CONFIRM;
+std::string VERSION_GAME_EXISTS;
+std::string VERSION_ERROR_TEXT;
+std::string CONFIRM_REMOVE_GAME;
+std::string CONFIRM_REMOVE_MOD;
+std::string NON_ZIP_MOD_FOUND;
+std::string MOVE_MOD_FAILED;
+std::string HAVE_UNINSTALLED_MOD;
+std::string REMOVE_GAME_ERROR;
+std::string SEARCH_TEXT;
+std::string SEARCH_BUTTON;
+std::string DELETE_BUTTON;
+std::string INPUT_BUTTON;
+std::string RESULT_BUTTON;
+std::string KEYBOARD_BUTTON;
+std::string PROMPT_SEARCH_TEXT;
+std::string MTP_TITLE_TEXT;
+std::string MTP_START_BUTTON;
+std::string MTP_STOP_BUTTON;
+std::string MTP_NOT_RUNNING_TEXT;
+std::string MTP_NOUSB_RUNNING_TEXT;
+std::string MTP_NOT_RUNNING_REAL_TEXT;
+std::string MTP_WRITEING_TAG;
+std::string MTP_READING_TAG;
+std::string MTP_CONFIRM_STOP_TEXT;
+std::string MTP_RENAME_FOLDER_TAG;
+std::string MTP_DELETE_FOLDER_TAG;
+std::string MTP_CREATE_FOLDER_TAG;
+std::string MTP_RENAME_FILE_TAG;
+std::string MTP_DELETE_FILE_TAG;
+std::string MTP_STATUS_DISCONNECTED_TEXT;
+std::string MTP_STATUS_CONNECTED_TEXT;
+std::string MTP_WRITEING_DONE_TAG;
+std::string MTP_READING_DONE_TAG;
+std::string MTP_WRITEING_PROGRESS_TAG;
+std::string MTP_READING_PROGRESS_TAG;
+std::string LIST_DIALOG_MTP;
 
 namespace tj {
 
@@ -305,7 +359,6 @@ bool LangManager::loadLanguage(const std::string& langCode) {
             {"COSMETIC_TEXT", std::ref(COSMETIC_TEXT)},
             {"NONE_TEXT", std::ref(NONE_TEXT)},
             {"PLAY_TEXT", std::ref(PLAY_TEXT)},
-            
             {"CONFIRM_INSTALLED", std::ref(CONFIRM_INSTALLED)},
             {"CONFIRM_UNINSTALLED", std::ref(CONFIRM_UNINSTALLED)},
             {"SUCCESS_INSTALLED", std::ref(SUCCESS_INSTALLED)},
@@ -324,7 +377,6 @@ bool LangManager::loadLanguage(const std::string& langCode) {
             {"CLEAR_BUTTON", std::ref(CLEAR_BUTTON)},
             {"FILE_NONE", std::ref(FILE_NONE)},
             {"DNOT_READY", std::ref(DNOT_READY)},
-
             {"ZIP_OPEN_ERROR", std::ref(ZIP_OPEN_ERROR)},
             {"ZIP_READ_ERROR", std::ref(ZIP_READ_ERROR)},
             {"CANT_READ_ERROR", std::ref(CANT_READ_ERROR)},
@@ -332,29 +384,90 @@ bool LangManager::loadLanguage(const std::string& langCode) {
             {"CANT_WRITE_ERROR", std::ref(CANT_WRITE_ERROR)},
             {"Aggregating_Files", std::ref(Aggregating_Files)},
             {"Add_Mod_BUTTON", std::ref(Add_Mod_BUTTON)},
+            {"BUTTON_CANCEL", std::ref(BUTTON_CANCEL)},
             {"Game_VERSION_TAG", std::ref(Game_VERSION_TAG)},
+            {"VERSION_TAG", std::ref(VERSION_TAG)},
             {"MOD_VERSION_TAG", std::ref(MOD_VERSION_TAG)},
             {"MOD_COUNT_TAG", std::ref(MOD_COUNT_TAG)},
             {"OPTION_BUTTON", std::ref(OPTION_BUTTON)},
-            {"LIST_OPTION_TEXT", std::ref(LIST_OPTION_TEXT)},
-            {"MODLIST_OPTION_TEXT", std::ref(MODLIST_OPTION_TEXT)},
+            {"LIST_DIALOG_CUSTOM_NAME", std::ref(LIST_DIALOG_CUSTOM_NAME)},
+            {"LIST_DIALOG_MODVERSION", std::ref(LIST_DIALOG_MODVERSION)},
+            {"LIST_DIALOG_ADDGAME", std::ref(LIST_DIALOG_ADDGAME)},
+            {"LIST_DIALOG_ViewDetails", std::ref(LIST_DIALOG_ViewDetails)},
+            {"LIST_DIALOG_ABOUTAUTHOR", std::ref(LIST_DIALOG_ABOUTAUTHOR)},
+            {"LIST_DIALOG_MODTYPE", std::ref(LIST_DIALOG_MODTYPE)},
+            {"LIST_DIALOG_MOD_DESCRIPTION", std::ref(LIST_DIALOG_MOD_DESCRIPTION)},
+            {"LIST_DIALOG_APPENDMOD", std::ref(LIST_DIALOG_APPENDMOD)},
+            {"LIST_DIALOG_FPSPATCH", std::ref(LIST_DIALOG_FPSPATCH)},
+            {"LIST_DIALOG_HDPATCH", std::ref(LIST_DIALOG_HDPATCH)},
+            {"LIST_DIALOG_COSMETICPATCH", std::ref(LIST_DIALOG_COSMETICPATCH)},
+            {"LIST_DIALOG_PLAYPATCH", std::ref(LIST_DIALOG_PLAYPATCH)},
+            {"LIST_DIALOG_CHEATPATCH", std::ref(LIST_DIALOG_CHEATPATCH)},
+            {"PRESS_B_STOP", std::ref(PRESS_B_STOP)},
+            {"OK_BUTTON", std::ref(OK_BUTTON)},
             {"NAME_INPUT_TEXT", std::ref(NAME_INPUT_TEXT)},
             {"MOD_DESCRIPTION_TEXT", std::ref(MOD_DESCRIPTION_TEXT)},
-            {"MODTYPE_OPTION_TEXT", std::ref(MODTYPE_OPTION_TEXT)},
             {"MOD_VERSION_INPUT_TEXT", std::ref(MOD_VERSION_INPUT_TEXT)},
-            {"BUTTON_CANCEL", std::ref(BUTTON_CANCEL)},
             {"OPTION_MEMU_TITLE", std::ref(OPTION_MEMU_TITLE)},
             {"OPTION_MODTYPE_MEMU_TITLE", std::ref(OPTION_MODTYPE_MEMU_TITLE)},
             {"OPTION_APPENDMOD_MEMU_TITLE", std::ref(OPTION_APPENDMOD_MEMU_TITLE)},
             {"ADDING_MOD_TEXT", std::ref(ADDING_MOD_TEXT)},
             {"ADD_MOD_DONE_TEXT", std::ref(ADD_MOD_DONE_TEXT)},
             {"ADD_MOD_STOP_TEXT", std::ref(ADD_MOD_STOP_TEXT)},
-            {"VERSION_TAG", std::ref(VERSION_TAG)},
             {"CREATE_GAME_DIR_ERROR", std::ref(CREATE_GAME_DIR_ERROR)},
             {"CREATE_GAME_ID_DIR_ERROR", std::ref(CREATE_GAME_ID_DIR_ERROR)},
             {"UNKNOWN_ERROR", std::ref(UNKNOWN_ERROR)},
             {"READD_ERROR", std::ref(READD_ERROR)},
             {"NO_FOUND_MOD_ERROR", std::ref(NO_FOUND_MOD_ERROR)},
+            {"SOFTWARE_TITLE_ADDGAME", std::ref(SOFTWARE_TITLE_ADDGAME)},
+            {"NO_FOUND_GAME", std::ref(NO_FOUND_GAME)},
+            {"WAIT_SCAN_TEXT", std::ref(WAIT_SCAN_TEXT)},
+            {"IS_FAVORITE", std::ref(IS_FAVORITE)},
+            {"IS_NOT_FAVORITE", std::ref(IS_NOT_FAVORITE)},
+            {"LIST_DIALOG_REMOVE_MOD", std::ref(LIST_DIALOG_REMOVE_MOD)},
+            {"LIST_DIALOG_REMOVE_GAME", std::ref(LIST_DIALOG_REMOVE_GAME)},
+            {"CANNOT_REMOVE_INSTALLED_MOD", std::ref(CANNOT_REMOVE_INSTALLED_MOD)},
+            {"REMOVE_LAST_MOD_CONFIRM", std::ref(REMOVE_LAST_MOD_CONFIRM)},
+            {"VERSION_GAME_EXISTS", std::ref(VERSION_GAME_EXISTS)},
+            {"VERSION_ERROR_TEXT", std::ref(VERSION_ERROR_TEXT)},
+            {"CONFIRM_REMOVE_GAME", std::ref(CONFIRM_REMOVE_GAME)},
+            {"CONFIRM_REMOVE_MOD", std::ref(CONFIRM_REMOVE_MOD)},
+            {"NON_ZIP_MOD_FOUND", std::ref(NON_ZIP_MOD_FOUND)},
+            {"MOVE_MOD_FAILED", std::ref(MOVE_MOD_FAILED)},
+            {"HAVE_UNINSTALLED_MOD", std::ref(HAVE_UNINSTALLED_MOD)},
+            {"REMOVE_GAME_ERROR", std::ref(REMOVE_GAME_ERROR)},
+            {"SEARCH_TEXT", std::ref(SEARCH_TEXT)},
+            {"SEARCH_BUTTON", std::ref(SEARCH_BUTTON)},
+            {"DELETE_BUTTON", std::ref(DELETE_BUTTON)},
+            {"INPUT_BUTTON", std::ref(INPUT_BUTTON)},
+            {"RESULT_BUTTON", std::ref(RESULT_BUTTON)},
+            {"KEYBOARD_BUTTON", std::ref(KEYBOARD_BUTTON)},
+            {"PROMPT_SEARCH_TEXT", std::ref(PROMPT_SEARCH_TEXT)},
+            {"MTP_TITLE_TEXT", std::ref(MTP_TITLE_TEXT)},
+            {"MTP_START_BUTTON", std::ref(MTP_START_BUTTON)},
+            {"MTP_STOP_BUTTON", std::ref(MTP_STOP_BUTTON)},
+            {"MTP_NOT_RUNNING_TEXT", std::ref(MTP_NOT_RUNNING_TEXT)},
+            {"MTP_NOUSB_RUNNING_TEXT", std::ref(MTP_NOUSB_RUNNING_TEXT)},
+            {"MTP_NOT_RUNNING_REAL_TEXT", std::ref(MTP_NOT_RUNNING_REAL_TEXT)},
+            {"MTP_WRITEING_TAG", std::ref(MTP_WRITEING_TAG)},
+            {"MTP_READING_TAG", std::ref(MTP_READING_TAG)},
+            {"MTP_CONFIRM_STOP_TEXT", std::ref(MTP_CONFIRM_STOP_TEXT)},
+            {"MTP_RENAME_FOLDER_TAG", std::ref(MTP_RENAME_FOLDER_TAG)},
+            {"MTP_DELETE_FOLDER_TAG", std::ref(MTP_DELETE_FOLDER_TAG)},
+            {"MTP_CREATE_FOLDER_TAG", std::ref(MTP_CREATE_FOLDER_TAG)},
+            {"MTP_RENAME_FILE_TAG", std::ref(MTP_RENAME_FILE_TAG)},
+            {"MTP_DELETE_FILE_TAG", std::ref(MTP_DELETE_FILE_TAG)},
+            {"MTP_STATUS_DISCONNECTED_TEXT", std::ref(MTP_STATUS_DISCONNECTED_TEXT)},
+            {"MTP_STATUS_CONNECTED_TEXT", std::ref(MTP_STATUS_CONNECTED_TEXT)},
+            {"MTP_WRITEING_DONE_TAG", std::ref(MTP_WRITEING_DONE_TAG)},
+            {"MTP_READING_DONE_TAG", std::ref(MTP_READING_DONE_TAG)},
+            {"MTP_WRITEING_PROGRESS_TAG", std::ref(MTP_WRITEING_PROGRESS_TAG)},
+            {"MTP_READING_PROGRESS_TAG", std::ref(MTP_READING_PROGRESS_TAG)},
+            {"LIST_DIALOG_MTP", std::ref(LIST_DIALOG_MTP)},
+            
+
+            
+
         };
 
         // 遍历映射表进行赋值 - 修改为更兼容的遍历方式

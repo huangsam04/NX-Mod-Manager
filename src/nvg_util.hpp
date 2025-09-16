@@ -248,4 +248,31 @@ void drawButtons(NVGcontext* vg, Colour color = Colour::WHITE, std::same_as<pair
     }
 }
 
+// 在顶部绘制按钮的函数 (Function to draw buttons at the top)
+void drawButtonsTop(NVGcontext* vg, Colour color = Colour::WHITE, std::same_as<pair> auto ...args) {
+    const std::array list = {args...};
+    nvgBeginPath(vg);
+    nvgFontSize(vg, 24.f);
+    nvgTextAlign(vg, NVG_ALIGN_RIGHT | NVG_ALIGN_TOP);
+    nvgFillColor(vg, getColour(color));
+
+    float x = 1220.f;
+    const float y = 40.f;  // 顶部位置 (Top position)
+    float bounds[4]{};
+
+    for (const auto& [button, text] : list) {
+        nvgFontSize(vg, 20.f);
+        nvgTextBounds(vg, x, y, text, nullptr, bounds);
+        auto len = bounds[2] - bounds[0];
+        nvgText(vg, x, y, text, nullptr);
+
+        x -= len + 10.f;
+        nvgFontSize(vg, 30.f);
+        nvgTextBounds(vg, x, y - 7.f, getButton(button), nullptr, bounds);
+        len = bounds[2] - bounds[0];
+        nvgText(vg, x, y - 7.f, getButton(button), nullptr);
+        x -= len + 34.f;
+    }
+}
+
 } // namespace tj::gfx

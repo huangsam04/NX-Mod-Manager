@@ -224,6 +224,17 @@ public:
      */
     std::string normalizePath(const std::string& path);
 
+    std::string GetModJsonPath(const std::string& mod_dir_path);
+    std::string GetModDirName(const std::string& mod_dir_path);
+    // 从FILE_PATH中提取游戏目录名
+    std::string GetGameDirName(const std::string& game_file_path);
+
+    std::vector<std::string> GetGameAllModPath(const std::string& game_file_path);
+    
+    bool Removemodeformodlist(const std::string& mod_dir_path,ErrorCallback error_callback);
+    std::string Removemodechecklegality(const std::string& mod_dir_path);
+    bool Removemodesingezipmod(const std::string& mod_zip_path);
+    bool Removegameandallmods(const std::string& game_file_path,ErrorCallback error_callback);
 private:
     // 缓存的目标文件路径列表，用于卸载时直接删除 (Cached target file paths for direct deletion during uninstall)
     std::vector<std::string> cached_target_files;

@@ -1,5 +1,6 @@
 #include "mod_manager.hpp"
 #include "lang_manager.hpp"
+#include "json_manager.hpp"  // 添加JSON管理器头文件
 #include "miniz/miniz.h"
 #include "utils/logger.hpp"  // 添加日志头文件
 #include <switch.h>
@@ -1023,6 +1024,7 @@ bool ModManager::getModInstallType(const std::string& mod_path,
 
 
 
+
 bool ModManager::installModFromZipDirect(const std::string& zip_path,
                                         ProgressCallback progress_callback,
                                         ErrorCallback error_callback,
@@ -1876,4 +1878,266 @@ std::string ModManager::normalizePath(const std::string& path) {
     }
     
     return normalized;
+}
+
+// 接受一个mod目录的路径，检查其合法性（检查是否为单个ZIP文件）
+std::string ModManager::Removemodechecklegality(const std::string& mod_dir_path) {
+    // 检查路径是否为空 (Check if path is empty)
+    if (mod_dir_path.empty()) {
+        return "";
+    }
+    
+    // 打开目录 (Open directory)
+    DIR* dir = opendir(mod_dir_path.c_str());
+    if (dir == nullptr) {
+        return ""; // 无法打开目录 (Cannot open directory)
+    }
+    
+    std::string mod_zip_path = "";
+    
+    // 遍历目录 (Traverse directory)
+    struct dirent* entry;
+    int count = 0; // 计数器 (Counter)
+    
+    while ((entry = readdir(dir)) != nullptr) {
+        // 跳过 . 和 .. (Skip . and ..)
+        if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0) {
+            continue;
+        }
+        
+        count++; // 次数计数器+1 (Counter increment)
+
+        // 检查计数器大小，只要大于1，就代表不合法
+        if (count > 1) {
+            mod_zip_path = "";
+            break;
+        }
+        
+        // 检查是否为文件 (Check if it's a file)
+        if (entry->d_type != DT_REG) {
+            
+            break;
+        }
+        
+        // 检查是否为ZIP文件 (Check if it's a ZIP file)
+        std::string filename = entry->d_name;
+        size_t len = filename.length();
+
+        if (len <= 4) {
+            break;
+        }
+        
+        // 获取文件扩展名 (Get file extension)
+        std::string ext = filename.substr(len - 4);
+        
+        // 只对比 .ZIP 和 .zip 两种情况 (Only compare .ZIP and .zip)
+        if (ext != ".zip" && ext != ".ZIP") {
+            break;
+        } else {
+            mod_zip_path = mod_dir_path + "/" + filename;
+        }
+            
+        
+    }
+    
+    closedir(dir);
+    
+    return mod_zip_path;
+}
+
+// 接受一个zip文件的路径，将这个zip文件移动到/mods2/0000-add-mod/目录下
+bool ModManager::Removemodesingezipmod(const std::string& mod_zip_path) {
+    // 提取文件名
+    size_t pos = mod_zip_path.find_last_of("/\\");
+    std::string filename = (pos != std::string::npos) ? mod_zip_path.substr(pos + 1) : mod_zip_path;
+    
+    // 构建目标路径
+    std::string target_path = "/mods2/0000-add-mod-0000/" + filename;
+
+    for (int i = 0; i < 20; ++i) {
+        // 检查目标文件是否存在 (Check if target file exists)
+        struct stat st;
+        if (stat(target_path.c_str(), &st) == 0) {
+            // 文件存在，生成新的文件名 (File exists, generate new filename)
+            target_path = "/mods2/0000-add-mod-0000/" + std::to_string(i + 1) + "-" + filename;
+            continue;
+        }
+
+        // 尝试重命名 (Try to rename)
+        if (rename(mod_zip_path.c_str(), target_path.c_str()) == 0) {
+            return true; // 成功 (Success)
+        } else {
+            return false; // 重命名失败 (Rename failed)
+        }
+    }
+
+    return false;
+    
+}
+
+std::string ModManager::GetModJsonPath(const std::string& mod_dir_path) {
+    // 直接截取到最后一个斜杠位置，拼接mod_name.json
+    size_t last_slash = mod_dir_path.find_last_of("/\\");
+    std::string mod_json_path = mod_dir_path.substr(0, last_slash) + "/mod_name.json";
+    return mod_json_path;
+}
+
+std::string ModManager::GetModDirName(const std::string& mod_dir_path) {
+    std::string mod_dir_name = mod_dir_path.substr(mod_dir_path.find_last_of("/\\") + 1);
+    return mod_dir_name;
+}
+
+// 从FILE_PATH中提取游戏目录名
+std::string ModManager::GetGameDirName(const std::string& game_file_path) {
+    // 固定格式为/mods2/游戏名字/ID，直接提取游戏名字部分
+    std::string path_without_prefix = game_file_path.substr(7); // 跳过"/mods2/"
+    size_t slash_pos = path_without_prefix.find('/'); // 查找第一个斜杠位置
+    return path_without_prefix.substr(0, slash_pos); // 返回游戏名字
+}
+
+// 接受MOD目录路径，一个错误回调函数，在这里负责处理错误反馈和remove调度
+bool ModManager::Removemodeformodlist(const std::string& mod_dir_path,ErrorCallback error_callback) {
+
+    // 检查合法性，是否为单个ZIP文件，不合法返回空
+    std::string mod_zip_path = Removemodechecklegality(mod_dir_path);
+    if (mod_zip_path.empty()) {
+        if (error_callback) {
+            error_callback(NON_ZIP_MOD_FOUND + mod_dir_path);
+        }
+        return false;
+    }
+
+    // 尝试移动到0000-add-mod-0000目录下
+    if (!Removemodesingezipmod(mod_zip_path)) {
+        if (error_callback) {
+            error_callback(MOVE_MOD_FAILED + mod_zip_path);
+        }
+        return false;
+    }
+
+    // 尝试删除mod目录,失败不管他。
+    if (remove(mod_dir_path.c_str()) != 0) {
+        // if (error_callback) {
+        //     error_callback("删除MOD目录失败，请检查！\n" + mod_dir_path);
+        // }
+        // return false;
+    }
+
+
+    std::string mod_json_path = GetModJsonPath(mod_dir_path);
+    std::string mod_dir_name = GetModDirName(mod_dir_path);
+
+    // 尝试删除modjson文件中的键（包含值),键就是mod目录名,失败不管他。
+    tj::JsonManager::RemoveRootJsonKeyValue(mod_json_path, mod_dir_name);
+
+    return true;
+    
+}
+
+std::vector<std::string> ModManager::GetGameAllModPath(const std::string& game_file_path) {
+    
+    // 遍历FILE_PATH路径下所有目录，生成包含所有目录的数组
+    std::vector<std::string> directories;
+    
+    DIR* dir = opendir(game_file_path.c_str());
+    if (dir != nullptr) {
+        struct dirent* entry;
+        while ((entry = readdir(dir)) != nullptr) {
+            // 跳过当前目录和父目录
+            if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0) {
+                continue;
+            }
+            // 使用entry的d_type成员检测是否为目录
+            if (entry->d_type == DT_DIR) {
+                // 检查entry->d_name的最后一位字符是否是'$',如果是check_mod_state变成false
+                std::string dir_name = entry->d_name;
+                if (!dir_name.empty() && dir_name.back() == '$') {
+                    closedir(dir);
+                    return {};
+                }
+                directories.push_back(game_file_path + "/" + dir_name);
+            }
+        }
+        closedir(dir);
+    }
+
+    return directories;
+    
+}
+
+
+bool ModManager::Removegameandallmods(const std::string& game_file_path,ErrorCallback error_callback) {
+
+    std::vector<std::string> directories = GetGameAllModPath(game_file_path);
+    
+    // 检查是否为空
+    if (directories.empty()) {
+        // 调用错误回调函数
+        if (error_callback) {
+            error_callback(HAVE_UNINSTALLED_MOD);
+        }
+        return false;
+    }
+
+    // 用来判断是否全部成功
+    int count = 0;
+
+    //  /mods2/游戏名字/ID/mod_name.json
+    std::string mod_json_path = game_file_path + "/mod_name.json";
+
+    //  /mods2/游戏名字
+    size_t second_last_slash = game_file_path.find_last_of('/');
+    std::string game_name_path = game_file_path.substr(0, second_last_slash);  // 提取到游戏名字路径
+    
+
+    // 先遍历一遍接收到的目录，尝试都移除
+    for (const auto& dir_path : directories) {
+
+        // 检查目录是否合法，不合法就跳过到下一个
+        std::string mod_zip_path = Removemodechecklegality(dir_path);
+        if (mod_zip_path.empty()) {
+            count++;
+            continue;
+        }
+
+        // 尝试移除目录下的ZIPmod，删除失败就跳过
+        if (!Removemodesingezipmod(mod_zip_path)) {
+            count++;
+            continue;
+        }
+
+        // 尝试删除目录，删除失败就跳过，不计数
+        if (remove(dir_path.c_str()) != 0) {
+            continue;
+        }
+
+        // 根据固定格式 /mods2/游戏名字/ID/模组的名字 解析路径
+        // 提取 /mods2/游戏名字/ID/ 作为 mod_json_path 的基础路径
+        size_t last_slash = dir_path.find_last_of('/');
+        std::string root_key = dir_path.substr(last_slash + 1);     // 模组的名字
+
+        // 调用JsonManager删除modjson中对应的根级键值对，失败不管
+        tj::JsonManager::RemoveRootJsonKeyValue(mod_json_path, root_key);
+
+    }
+
+    // 检查是否全部成功
+    if (count == 0) {
+        // 删除modjson文件，游戏路径，失败不管。
+        remove(mod_json_path.c_str());
+        remove(game_file_path.c_str());
+        remove(game_name_path.c_str());
+        std::string game_dir_name = GetGameDirName(game_file_path);
+        // 删除game_name.json中的游戏映射名，不管失败
+        tj::JsonManager::RemoveNestedJsonKeyValue("/mods2/game_name.json", "favorites$180", game_dir_name); 
+        tj::JsonManager::RemoveRootJsonKeyValue("/mods2/game_name.json", game_dir_name); 
+        return true;
+    }
+
+    // 调用错误回调函数
+    if (error_callback) {
+        error_callback(REMOVE_GAME_ERROR + std::to_string(count));
+    }
+
+    return false;
 }

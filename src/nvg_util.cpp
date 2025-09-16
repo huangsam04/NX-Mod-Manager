@@ -346,7 +346,6 @@ void drawTextWithButtonMarker(NVGcontext* vg, float x, float y, float size, cons
     
     // 计算各部分的宽度
     nvgFontSize(vg, size);
-    nvgFontFace(vg, "Standard");
     
     // 第一部分文本（[PLUS]之前）
     float part1_width = 0;
@@ -355,12 +354,10 @@ void drawTextWithButtonMarker(NVGcontext* vg, float x, float y, float size, cons
     }
     
     // 按钮部分
-    nvgFontFace(vg, "Extended");
     const char* plus_char = getButton(Button::PLUS);
     float button_width = nvgTextBounds(vg, 0, 0, plus_char, nullptr, nullptr);
     
     // 第二部分文本（[PLUS]之后）
-    nvgFontFace(vg, "Standard");
     float part2_width = 0;
     if (marker_end && (end == nullptr || marker_end < end) && *marker_end != '\0') {
         part2_width = nvgTextBounds(vg, 0, 0, marker_end, end, nullptr);
@@ -386,14 +383,12 @@ void drawTextWithButtonMarker(NVGcontext* vg, float x, float y, float size, cons
     
     // 绘制第一部分文本
     if (part1_width > 0) {
-        nvgFontFace(vg, "Standard");
         nvgTextAlign(vg, NVG_ALIGN_LEFT | vertical_align);
         nvgText(vg, current_x, y, str, marker_start);
         current_x += part1_width + icon_spacing; // 添加图标前间距
     }
     
     // 绘制按钮
-    nvgFontFace(vg, "Extended");
     nvgTextAlign(vg, NVG_ALIGN_LEFT | vertical_align);
     nvgText(vg, current_x, y, plus_char, nullptr);
     current_x += button_width;
@@ -401,7 +396,6 @@ void drawTextWithButtonMarker(NVGcontext* vg, float x, float y, float size, cons
     // 绘制第二部分文本
     if (part2_width > 0) {
         current_x += icon_spacing; // 添加图标后间距
-        nvgFontFace(vg, "Standard");
         nvgTextAlign(vg, NVG_ALIGN_LEFT | vertical_align);
         nvgText(vg, current_x, y, marker_end, end);
     }

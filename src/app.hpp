@@ -5,6 +5,7 @@
 #include "async.hpp"
 #include "audio_manager.hpp"
 #include "mod_manager.hpp"
+#include "mtp_manager.hpp"
 #include "yyjson/yyjson.h"
 
 #include <switch.h>
@@ -32,15 +33,16 @@ struct ModNameInfo {
 
 using AppID = std::uint64_t;
 
-enum class MenuMode { LOAD, LIST, MODLIST, INSTRUCTION, ADDGAMELIST };
+enum class MenuMode { LOAD, LIST, MODLIST, INSTRUCTION, ADDGAMELIST,MTP};
 
 // 对话框类型枚举 (Dialog type enumeration)
-enum class DialogType {
-    INFO,           // 信息对话框 (Information dialog)
+enum class newDialogType {
     CONFIRM,        // 确认对话框 (Confirmation dialog)
     COPY_PROGRESS,  // 复制进度对话框 (Copy progress dialog)
     LIST_SELECT,    // 列表选择对话框 (List select dialog)
+    SEARCH,         // 搜索对话框 (Search dialog)
 };
+
 
 // 复制进度信息结构体 (Copy progress info structure)
 struct CopyProgressInfo {
@@ -106,11 +108,12 @@ struct AppEntry final {
     std::string FILE_PATH; //mods2/游戏名字/ID
     std::string MOD_VERSION;
     std::string MOD_TOTAL;
+    size_t unique_id;
+    bool is_favorite{false};
 };
 
 struct AppEntry_AddGame final {
     std::string name;
-
     std::string display_version;
     AppID id;
     int image;
@@ -120,6 +123,7 @@ struct AppEntry_AddGame final {
     // Cached raw icon data to avoid repeated cache reads
     std::vector<unsigned char> cached_icon_data;
     bool has_cached_icon{false};
+    size_t unique_id;
 };
 
 
@@ -138,7 +142,7 @@ enum class ResourceTaskType {
 };
 
 struct ResourceLoadTask {
-    u64 application_id;
+    size_t unique_id;  // 使用unique_id替代application_id (Use unique_id instead of application_id)
     std::function<void()> load_callback;
     std::chrono::steady_clock::time_point submit_time;
     int priority; // 优先级，数值越小优先级越高 (Priority, lower value = higher priority)
@@ -185,7 +189,6 @@ private:
     bool TryGetAppBasicInfoWithIconCache(u64 application_id, AppEntry& entry);
     bool TryGetAppBasicInfoWithIconCacheForAddGame(u64 application_id, AppEntry_AddGame& entry); // 专用于AddGame界面的应用信息获取函数 (Dedicated app info function for AddGame interface)
     std::string TryGetAppEnglishName(u64 application_id);
-    std::string SanitizeGameNameForPath(const std::string& game_name); // 清理游戏名中的路径敏感字符 (Clean path-sensitive characters in game name)
     
     Result GetAllApplicationIds(std::vector<u64>& app_ids);
     
@@ -208,23 +211,6 @@ private:
     
     // 对比mod版本和游戏版本是否一致的辅助函数 (Helper function to compare mod version and game version consistency)
     bool CompareModGameVersion(const std::string& mod_version, const std::string& game_version);
-    
-    // 辅助函数：确保JSON文件存在，如果不存在则创建空JSON文件
-    // Helper function: Ensure JSON file exists, create empty JSON file if not
-    bool EnsureJsonFileExists(const std::string& json_path);
-    
-    // JSON文件键值操作函数：替换现有键的值（如果键不存在则添加）
-    // JSON file key-value operation function: replace existing key value (add if key doesn't exist)
-    bool UpdateJsonKeyValue(const std::string& json_path, const std::string& key, const std::string& value);
-    
-    // MOD专用JSON文件键值操作函数：处理嵌套的JSON结构修改
-    // MOD-specific JSON file key-value operation function: handle nested JSON structure modifications
-    bool UpdateJsonKeyValue_MOD(const std::string& json_path, const std::string& root_key, 
-                                const std::string& nested_key, const std::string& nested_value);
-    
-    // MOD专用JSON文件根键操作函数：仅处理根键的创建或修改
-    // MOD-specific JSON file root key operation function: handle root key creation or modification only
-    bool UpdateJsonKey_MOD(const std::string& json_path, const std::string& old_root_key, const std::string& new_root_key);
     
     // 计算当前可见区域的应用索引范围
     // Calculate the index range of applications in current visible area
@@ -249,6 +235,7 @@ private:
     NVGcontext* vg{nullptr};
     std::vector<AppEntry> entries;
     std::vector<AppEntry_AddGame> entries_AddGame;
+    size_t unique_id{0};
     std::vector<MODINFO> mod_info;
 
     PadState pad{};
@@ -261,6 +248,7 @@ private:
     int HD_MOD_image{};
     int More_PLAY_MOD_image{};
     int NONE_MOD_image{};
+    int like_image{};
     
     // MOD图标延迟加载标志位 (MOD icons lazy loading flag)
     bool mod_icons_loaded{false};
@@ -314,6 +302,12 @@ private:
     float mod_ypos{130.f};     // MOD列表的Y坐标位置 (Y coordinate position for MOD list)
     MenuMode menu_mode{MenuMode::LOAD};
 
+    // MTP相关成员变量 (MTP related member variables)
+    mtp::MtpManager* mtp_manager{nullptr};  // MTP管理器实例 (MTP manager instance)
+    std::vector<std::string> mtp_log_history;  // MTP日志历史记录 (MTP log history)
+    mtp::MtpStatus last_mtp_status{mtp::MtpStatus::Stopped};  // 上次MTP状态 (Last MTP status)
+    // 注意：已移除last_connection_status和last_transfer_active，因为现在直接使用格式化字符串
+
     bool quit{false};
 
     enum class SortType {
@@ -321,27 +315,169 @@ private:
         Alphabetical,          // A-Z排序 (A-Z sorting)
         MAX,
     };
+
+    enum class SortType_AddGame {
+        Alphabetical_Reverse,  // Z-A排序 (Z-A sorting)
+        Alphabetical,          // A-Z排序 (A-Z sorting)
+        MAX,
+    };
     
     int sort_type{0}; 
+    int sort_type_AddGame{0};
+    
+// =======================================新对话框系统======================================================================
 
+// ========================确认对话框======================
+
+    // 对话框回调函数类型定义 (Dialog callback function type definition)
+    using DialogConfirmCallback = std::function<void(bool confirmed)>;
+    
     // 对话框相关成员变量 (Dialog related member variables)
-    DialogType dialog_type{DialogType::INFO};  // 当前对话框类型 (Current dialog type)
-    bool show_dialog{false};                   // 是否显示对话框 (Whether to show dialog)
-    std::string dialog_content;                // 对话框内容 (Dialog content)
-    std::string dialog_button_ok{"确定"};       // 确定按钮文本 (OK button text)
-    std::string dialog_button_cancel{"取消"};   // 取消按钮文本 (Cancel button text)
-    bool dialog_selected_ok{true};            // 对话框中选中的按钮（true=确定，false=取消）(Selected button in dialog)
-    float dialog_content_font_size{18.0f};    // 对话框内容字体大小 (Dialog content font size)
-    int dialog_content_align{NVG_ALIGN_CENTER | NVG_ALIGN_MIDDLE}; // 内容对齐方式 (Content alignment)
+    newDialogType newdialog_type{newDialogType::CONFIRM};  // 当前对话框类型 (Current dialog type)
+    bool show_newdialog{false};                     // 是否显示对话框 (Whether to show dialog)
+    std::string newdialog_content{""};                  // 对话框内容 (Dialog content)
+    bool newdialog_button{false};            // ture代表确认，false代表取消按钮
+    int newdialog_result{-1};            // -1代表没选，0代表取消，1代表确认
+    float newdialog_content_font_size{26.0f};    // 对话框内容字体大小 (Dialog content font size)
+    int newdialog_content_align{NVG_ALIGN_CENTER | NVG_ALIGN_MIDDLE}; // 内容对齐方式 (Content alignment)
+    DialogConfirmCallback newdialog_callback{nullptr}; // 对话框确认回调函数 (Dialog confirm callback function)
+
+// ========================确认对话框======================
+
+
+// ========================列表对话框======================
+
+    // 对话框回调函数类型定义 (Dialog callback function type definition)
+    using DialogListSelectCallback = std::function<void(const std::vector<std::string>& selected_items, bool cancelled)>;
     
-    // LIST_SELECT对话框相关成员变量 (LIST_SELECT dialog related member variables)
-    std::vector<std::string> dialog_list_items; // 列表选择项 (List selection items)
-    size_t dialog_list_selected_index{0};      // 当前选中的列表项索引 (Currently selected list item index)
-    size_t dialog_list_start_index{0};         // 列表显示的起始索引，用于分页 (Start index for list display, used for paging)
-    int dialog_list_selected_result{-1};       // 用户选择的结果索引，-1表示未选择或取消 (User selected result index, -1 means not selected or cancelled)
-    int dialog_list_type{-1}; // 对话框菜单类型 
-    std::string dialog_list_title{""}; // 对话框标题
+    // 对话框相关成员变量 (Dialog related member variables)
+    std::string newdialog_list_title{""}; // 对话框标题
+    std::vector<std::string> newdialog_list_items; // 列表选择项 (List selection items)
+    size_t newdialog_list_selected_index{0};      // 当前选中的列表项索引 (Currently selected list item index)
+    size_t newdialog_list_start_index{0};         // 列表显示的起始索引，用于分页 (Start index for list display, used for paging)
+    bool multiple_select_mode{false}; // 多选模式 (Multi-select mode)
+    // 多选功能相关成员变量 (Multi-selection related member variables)
+    std::vector<std::string> newdialog_list_selected_items; // 已选中的列表项内容 (Selected list item contents)
+    std::unordered_set<size_t> newdialog_list_selected_indices; // 已选中的列表项索引集合 (Set of selected list item indices)
+    DialogListSelectCallback newdialog_list_callback{nullptr}; // 对话框确认回调函数 (Dialog confirm callback function)
+
+// ========================列表对话框======================
+
+// ========================进度对话框======================
+
+    std::string newdialog_title{""}; 
     
+
+// ========================进度对话框======================
+
+// ========================搜索对话框======================
+
+using DialogSearchCallback = std::function<void(int result_index)>;
+DialogSearchCallback newdialog_search_callback{nullptr};
+
+// 虚拟键盘选中状态相关 (Virtual keyboard selection state related)
+    int keyboard_selected_row{0};    // 当前选中的键盘行 (Currently selected keyboard row)
+    int keyboard_selected_col{0};    // 当前选中的键盘列 (Currently selected keyboard column)
+    
+    // 搜索功能相关 (Search functionality related)
+    std::vector<std::pair<std::string, int>> search_results{};  // 搜索结果数组：first存储字符串结果，second存储在search_context中的索引位置 (Search results array: first stores string result, second stores index position in search_context)
+    std::vector<std::string> search_context{}; // 搜索上下文 (Search context)
+    int search_selected_index{0};          // 搜索结果中当前选中的索引 (Currently selected index in search results)
+    bool search_has_results{false};        // 是否有搜索结果 (Whether there are search results)
+    
+    // 触摸状态跟踪变量 (Touch state tracking variables)
+    bool touch_locked{false};              // 触摸锁定状态：true=已锁定，false=可触摸 (Touch lock state: true=locked, false=touchable)
+    bool last_touch_pressed{false};        // 上一帧的触摸按下状态 (Last frame touch pressed state)
+    
+    // L形按钮持续触发相关变量 (L-shaped button continuous trigger variables)
+    bool right_l_button_held{false};       // 右侧L形按钮是否被按住 (Whether right L-shaped button is held)
+    std::chrono::steady_clock::time_point right_l_button_press_start; // 右侧L形按钮按下开始时间 (Right L-shaped button press start time)
+    std::chrono::steady_clock::time_point right_l_button_last_trigger; // 右侧L形按钮上次触发时间 (Right L-shaped button last trigger time)
+    static constexpr int RIGHT_L_BUTTON_INITIAL_DELAY_MS = 500;  // 初始延迟500ms (Initial delay 500ms)
+    static constexpr int RIGHT_L_BUTTON_REPEAT_INTERVAL_MS = 80; // 重复间隔100ms (Repeat interval 80ms)
+    
+    // 搜索回调延迟执行：复用search_selected_index作为待执行索引，复用last_frame_time作为延迟计时 (Search callback delayed execution: reuse search_selected_index as pending index, reuse last_frame_time for delay timing)
+    bool pending_search_callback{false};   // 是否有待执行的搜索回调 (Whether there is a pending search callback)
+
+    // 搜索界面状态管理 (Search interface state management)
+    enum class SearchMode {
+        KEYBOARD,    // 虚拟键盘模式 (Virtual keyboard mode)
+        GAME_LIST    // 游戏列表模式 (Game list mode)
+    };
+    SearchMode search_mode{SearchMode::KEYBOARD};  // 当前搜索界面模式 (Current search interface mode)
+    
+    // L形按钮选中状态 (L-shaped button selection state)
+    bool left_l_button_selected{false};   // 左侧L形按钮是否被选中 (Whether left L-shaped button is selected)
+    bool right_l_button_selected{false};  // 右侧L形按钮是否被选中 (Whether right L-shaped button is selected)
+
+// ========================搜索对话框======================
+
+
+    void newDrawDialog();
+    void newDrawDialogConfirm();
+    void newDrawDialogCopyProgress();
+    void newDrawDialogListSelect();
+    void newDrawDialogBackground();
+    void newDrawDialogSearch();
+    
+    void newUpdateDialog();
+    void newUpdateDialogConfirm();
+    void newUpdateDialogCopyProgress();
+    void newUpdateDialogListSelect();
+    void newUpdateDialogSearch();
+    void newUpdateTouchDialogSearch();
+
+    void newHideDialog();
+    void newHideDialogConfirm();
+    void newHideDialogCopyProgress();
+    void newHideDialogListSelect();
+    void newHideDialogSearch();
+
+    void newShowDialogConfirm(const std::string& newdialog_content,
+                                DialogConfirmCallback callback = nullptr,
+                                float newdialog_content_font_size = 26.0f,
+                                int newdialog_content_align = NVG_ALIGN_CENTER | NVG_ALIGN_MIDDLE);
+
+    void newShowDialogCopyProgress(const std::string& newdialog_title,
+                                const std::string& newdialog_content);
+
+    void newShowDialogListSelect(const std::string& newdialog_list_title,
+                                const std::vector<std::string>& newdialog_list_items,
+                                bool multiple_select_mode = false,
+                                DialogListSelectCallback callback = nullptr,
+                                float newdialog_content_font_size = 24.0f);
+
+    void newShowDialogSearch(std::vector<std::string>& search_context, DialogSearchCallback callback = nullptr);
+
+    void newListMenuCenter(const std::string& function);
+
+    // 更新复制进度 (Update copy progress)
+    void newUpdateCopyProgress(const CopyProgressInfo& progress);
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// =======================================新对话框系统======================================================================
+
+
     // 多选功能相关成员变量 (Multi-selection related member variables)
     std::vector<std::string> dialog_list_selected_items; // 已选中的列表项内容 (Selected list item contents)
     std::unordered_set<size_t> dialog_list_selected_indices; // 已选中的列表项索引集合 (Set of selected list item indices)
@@ -383,6 +519,10 @@ private:
     // 游戏名称映射相关 (Game name mapping related)
     std::unordered_map<std::string, ModNameInfo> game_name_cache; // 缓存已加载的游戏名称映射数据 (Cache for loaded game name mapping data)
     
+    // 分类存储的二维数组 (Categorized storage arrays)
+    std::vector<std::string> favorites_games_array;     // 喜欢的游戏一维数组，只存储游戏目录名 (Favorites games 1D array, only stores game directory names)
+    std::vector<std::string> non_favorites_games_array; // 非喜欢的游戏一维数组，只存储游戏目录名 (Non-favorites games 1D array, only stores game directory names)
+    
     // MOD管理器相关 (MOD manager related)
     ModManager mod_manager; // MOD压缩解压管理器 (MOD compression/decompression manager)
     util::AsyncFurture<bool> mod_install_task; // 异步MOD安装任务 (Async MOD installation task)
@@ -394,55 +534,45 @@ private:
 
     void Sort();
     void Sort2(); // ADDGAMELIST界面专用的排序函数 (Dedicated sorting function for ADDGAMELIST interface)
+    
+    // 排序辅助函数：比较两个AppEntry的排序优先级 (Sorting helper function: compare sorting priority of two AppEntry)
+    bool CompareAppEntries(const AppEntry& a, const AppEntry& b, bool reverse_order);
     const char* GetSortStr();
-    void changegamename();
-    void changemodversion();
+    const char* GetSortStr2();
+
+    std::string GetModJsonPath();
+    std::string GetGameDirName();
+    std::string GetModDirName();
 
     void UpdateLoad();
     void UpdateList();
     void UpdateModList(); // 更新MOD列表界面 (Update MOD list interface)
     void UpdateInstruction(); // 更新教程界面 (Update instruction interface)
     void UpdateAddGameList(); // 更新添加游戏列表界面 (Update add game list interface)
+    void UpdateMTP(); // 更新MTP界面 (Update MTP interface)
+
     void DrawBackground();
     void DrawLoad();
     void DrawList();
     void DrawModList(); // 绘制MOD列表界面 (Draw MOD list interface)
     void DrawInstruction(); // 绘制教程界面 (Draw instruction interface)
     void DrawAddGameList(); 
+    void DrawMTP(); // 绘制MTP界面 (Draw MTP interface)
     
-    // 对话框相关函数 (Dialog related functions)
-    /**
-     * 显示对话框
-     * @param type 对话框类型 (NONE, CONFIRM, INFO, WARNING)
-     * @param content 对话框内容文本
-     * @param content_font_size 内容字体大小，默认18.0f
-     * @param content_align 内容对齐方式，默认居中中间对齐 (NVG_ALIGN_CENTER | NVG_ALIGN_MIDDLE)
-     * 
-     * 对齐方式可选值：
-     * 水平对齐: NVG_ALIGN_LEFT, NVG_ALIGN_CENTER, NVG_ALIGN_RIGHT
-     * 垂直对齐: NVG_ALIGN_TOP, NVG_ALIGN_MIDDLE, NVG_ALIGN_BOTTOM, NVG_ALIGN_BASELINE
-     * 可以使用 | 操作符组合水平和垂直对齐方式
-     */
-    void ShowDialog(DialogType type, const std::string& content,
-                   float content_font_size = 18.0f,
-                   int content_align = NVG_ALIGN_CENTER | NVG_ALIGN_MIDDLE);
-    void ShowCopyProgressDialog(const std::string& title); // 显示复制进度对话框 (Show copy progress dialog)
-    void UpdateCopyProgress(const CopyProgressInfo& progress); // 更新复制进度 (Update copy progress)
-    void HideDialog();
-    void DrawDialog();
-    void UpdateDialog();
-    void Dialog_Menu(); // 对话框菜单处理中心 (Dialog menu processing center)
-    void Dialog_LIST_Menu();// 主界面右侧菜单处理中心 (Main interface right menu processing center)
-    void Dialog_MODLIST_Menu();// MOD列表界面右侧菜单处理中心 (MOD list interface right menu processing center)
-    void Dialog_MODLIST_TYPE_Menu();// 修改类型界面右侧菜单处理中心 (MOD list interface right menu processing center)
-    void Dialog_APPENDMOD_Menu();// 追加模组界面右侧菜单处理中心 (MOD list interface right menu processing center)
-    void Dialog_ADDGAME_Menu();// 添加游戏界面右侧菜单处理中心 (MOD list interface right menu processing center)
-
-    void changemodname();
-    void changemoddescription();
     
-    // LIST_SELECT对话框辅助函数 (LIST_SELECT dialog helper functions)
-    void ParseListSelectContent(const std::string& content); // 解析列表选择内容 (Parse list select content)
+    void Dialog_MODLIST_TYPE_Menu(const std::string& type);// 修改类型界面右侧菜单处理中心 (MOD list interface right menu processing center)
+    void Dialog_APPENDMOD_Menu(const std::vector<std::string>& selected_items);// 追加模组界面右侧菜单处理中心 (MOD list interface right menu processing center)
+    void Dialog_ADDGAME_Menu(const std::vector<std::string>& selected_items);// 添加游戏界面右侧菜单处理中心 (MOD list interface right menu processing center)
+    
+    void changegamename(); // 修改游戏名称 (Change game name)
+    void changemodversion(); // 修改模组版本 (Change MOD version)
+    void changemodname(); // 修改模组名称 (Change MOD name)
+    void changemoddescription(); // 修改模组描述 (Change MOD description)
+    void tofavorite(); // 标记喜欢 
+    void notfavorite(); // 取消标记
+    void RemoveMod(); // 移除模组
+    void RemoveGame(); // 移除游戏
+    
 
     // 模组名称映射相关函数 (MOD name mapping related functions)
     bool LoadModNameMapping(const std::string& FILE_PATH); // 加载指定游戏的模组名称映射 (Load MOD name mapping for specified game)
@@ -454,14 +584,22 @@ private:
     bool LoadGameNameMapping(); // 加载游戏名称映射 (Load game name mapping)
     std::string GetMappedGameName(const std::string& original_name, const std::string& mod_version); // 获取映射后的游戏名称 (Get mapped game name)
     void ClearGameNameCache(); // 清空游戏名称映射缓存 (Clear game name mapping cache)
+    void FilterSearchResults(const std::string& search_text); // 搜索过滤函数 (Search filter function)
     void clearaddgamelist(); // 清理AddGame界面的所有资源和状态 (Clear all AddGame interface resources and states)
+    
+    // 测试JSON解析函数：解析game_name.json，生成游戏路径名容器和映射关系 (Test JSON parsing function: parse game_name.json, generate game path container and mapping)
+    std::vector<std::string> testjson(std::unordered_map<std::string, std::string>& path_to_name_map);
 
     // 字符串格式化辅助函数声明 (String formatting helper function declarations)
     std::string GetSnprintf(const std::string& format_str, const std::string& value);
     std::string GetSnprintf(const std::string& format_str, const std::string& value1, const std::string& value2);
+    std::string GetSnprintf(const std::string& format_str, const std::string& value1, const std::string& value2, const std::string& value3);
     
     // 格式化时间显示函数
     std::string FormatDuration(double seconds);
+    
+    // 检测字符串是否100%为英文字符的函数声明 (Function declaration to detect if string is 100% English characters)
+    std::string IsEnglishText(const char text[512]);
 
     // MOD相关函数 (MOD related functions)
     void FastScanModInfo(); // 快速扫描MOD信息 (Fast scan MOD info)
@@ -469,13 +607,18 @@ private:
     void ChangeModName(); // 切换当前选中模组的安装状态并修改名称 (Toggle current selected mod install status and modify name)
     int ModInstalled(); // 安装选中的MOD到atmosphere目录 (Install selected MOD to atmosphere directory)
     int ModUninstalled(); // 卸载选中的MOD从atmosphere目录 (Uninstall selected MOD from atmosphere directory)
+    void MODinstallORuninstall();
     
     // 文件系统辅助函数 (Filesystem helper functions)
     bool CheckMods2Path(); // 检查并创建mods2文件夹结构 (Check and create mods2 folder structure)
-    std::string appendmodscan(); // 扫描add-mod文件夹中的ZIP文件并返回管道符分隔的字符串 (Scan ZIP files in add-mod folder and return pipe-separated string)
+    std::vector<std::string> appendmodscan(); // 扫描add-mod文件夹中的ZIP文件并返回字符串容器 (Scan ZIP files in add-mod folder and return string vector)
+    std::vector<std::string> scanmodgamedir(); 
     
     
     std::string GetFirstCharPinyin(const std::string& chinese_text); // 获取首字符拼音的辅助函数 (Helper function to get first character pinyin)
+    
+    // 游戏目录排序辅助函数 (Game directory sorting helper function)
+    bool gamedirsort(const std::string& game_dir_a, const std::string& game_dir_b);
     
     u32 getgameversioninfo(u64 application_id);
 
