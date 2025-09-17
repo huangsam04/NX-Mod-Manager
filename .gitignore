@@ -1,48 +1,42 @@
-# Build directories
-nxbuild/
-build/
+# Prerequisites
+*.d
 
-# Output files
-*.nro
-*.elf
-*.nacp
-*.map
-
-# Object files
+# Compiled Object files
+*.slo
+*.lo
 *.o
 *.obj
 
-# Dependency files
-*.d
+# Precompiled Headers
+*.gch
+*.pch
 
-# Temporary files
-*.tmp
-*.temp
+# Compiled Dynamic libraries
+*.so
+*.dylib
+*.dll
 
-# IDE files
+# Fortran module files
+*.mod
+*.smod
+
+# Compiled Static libraries
+*.lai
+*.la
+*.a
+*.lib
+
+# Executables
+*.exe
+*.out
+*.app
+
+# my ignores
+*.nro
+*.elf
+*.nacp
+nxbuild/
 .vscode/
-.idea/
-*.swp
-*.swo
-*~
-
-# OS generated files
-.DS_Store
-.DS_Store?
-._*
-.Spotlight-V100
-.Trashes
-ehthumbs.db
-Thumbs.db
-
-# Logs
-*.log
-
-# Archives
+switch/
 *.zip
-*.tar.gz
-*.rar
-
-# Backup files
-*.bak
-*.backup
+*.lst

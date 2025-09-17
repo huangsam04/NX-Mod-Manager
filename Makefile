@@ -42,7 +42,7 @@ include $(DEVKITPRO)/libnx/switch_rules
 
 APP_TITLE	:= NX-Mod-Manager
 APP_AUTHOR	:= Tom
-APP_VERSION	:= "2.0.0"
+APP_VERSION	:= "2.1.4"
 ICON		:= assets/icon.jpg
 
 TARGET		:=	NX-Mod-Manager
@@ -73,8 +73,8 @@ C_OPTIMISE	+=	-flto=3 -ffat-lto-objects -fuse-linker-plugin -flto-compression-le
 
 # warns
 MY_DEFINES	:=	-Wall #-Wextra #-Werror # todo: fix warns soon
-# stb (we only need jpeg for ns icons)
-MY_DEFINES	+=	-DSTBI_ONLY_JPEG
+# stb (support both jpeg and png)
+# MY_DEFINES	+=	-DSTBI_ONLY_JPEG  # 注释掉此行以支持PNG (Comment out this line to support PNG)
 # version
 MY_DEFINES	+= -DUNTITLED_VERSION_STRING=$(APP_VERSION)
 
@@ -87,13 +87,13 @@ CXXFLAGS	:= $(CFLAGS) -std=c++23 -fno-exceptions -fno-rtti
 ASFLAGS	:=	$(ARCH)
 LDFLAGS	=	-specs=$(DEVKITPRO)/libnx/switch.specs $(ARCH) -Wl,-Map,$(notdir $*.map)
 
-LIBS	:= -ldeko3d -lnx -lnxtc_version -lpulsar
+LIBS	:= -ldeko3d -lnx -lnxtc_version -lpulsar -llibhaze
 
 #---------------------------------------------------------------------------------
 # list of directories containing libraries, this must be the top level containing
 # include and lib
 #---------------------------------------------------------------------------------
-LIBDIRS	:= $(PORTLIBS) $(LIBNX) $(CURDIR)/lib/switch-libpulsar $(CURDIR)/lib/libnxtc-add-version
+LIBDIRS	:= $(PORTLIBS) $(LIBNX) $(CURDIR)/lib/switch-libpulsar $(CURDIR)/lib/libnxtc-add-version $(CURDIR)/lib/libhaze
 
 #---------------------------------------------------------------------------------
 # no real need to edit anything past this point unless you need to add additional
