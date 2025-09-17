@@ -253,6 +253,8 @@ SSM2/
 感谢以下开源项目和库的贡献：
 
 - **[untitled](https://github.com/ITotalJustice/untitled)** - ITotalJustice的untitled
+- **[libhaze](https://github.com/ITotalJustice/libhaze)** - ITotalJustice的libhaze
+- **[haze](https://github.com/Atmosphere-NX/Atmosphere/tree/master/troposphere/haze)** - Atmosphere-NX的haze
 
 ### 核心依赖
 - **[devkitPro](https://devkitpro.org/)** - Nintendo Switch开发工具链
