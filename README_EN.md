@@ -252,18 +252,14 @@ SSM2/
 Thanks to the following open source projects and libraries for their contributions:
 
 - **[untitled](https://github.com/ITotalJustice/untitled)** - ITotalJustice untitled
-
-### Core Dependencies
+- **[libhaze](https://github.com/ITotalJustice/libhaze)** - ITotalJustice的libhaze
+- **[haze](https://github.com/Atmosphere-NX/Atmosphere/tree/master/troposphere/haze)** - Atmosphere-NX的haze
 - **[devkitPro](https://devkitpro.org/)** - Nintendo Switch development toolchain
 - **[libnx](https://github.com/switchbrew/libnx)** - Switch system library providing low-level API support
 - **[deko3d](https://github.com/devkitPro/deko3d)** - Switch GPU graphics API for high-performance rendering
-
-### Graphics and Audio
 - **[NanoVG](https://github.com/memononen/nanovg)** - Lightweight 2D vector graphics library
 - **[switch-libpulsar](https://github.com/p-sam/switch-libpulsar)** - Switch audio playback library
 - **[fontstash](https://github.com/memononen/fontstash)** - Font rendering library
-
-### Utility Libraries
 - **[yyjson](https://github.com/ibireme/yyjson)** - High-performance JSON parsing library
 - **[libnxtc](https://github.com/DarkMatterCore/libnxtc)** - Title cache management library (this project uses libnxtc-add-version with added version member)
 - **[stb](https://github.com/nothings/stb)** - Image processing library
