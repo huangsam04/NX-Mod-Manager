@@ -1403,7 +1403,7 @@ void App::DrawMTP() {
     if (!this->mtp_log_history.empty()) {
         float y_offset = 126.f;  // 距离标题分界线(86.0f)40像素 (40 pixels from title divider line at 86.0f)
         for (const auto& log_entry : this->mtp_log_history) {
-            gfx::drawTextBox(this->vg, 40.f, y_offset, 1200.f, 24.f, 1.5f, 
+            gfx::drawTextBoxWithColorMarkup(this->vg, 40.f, y_offset, 1200.f, 24.f, 1.5f, 
                             log_entry.c_str(), nullptr, NVG_ALIGN_LEFT | NVG_ALIGN_TOP, gfx::Colour::WHITE);
             y_offset += 30.f;
             

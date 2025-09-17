@@ -107,8 +107,7 @@ public:
     bool MultiThreadTransfer(s64 size, bool read) override;
 
 private:
-    FsFileSystem m_fs;          // 文件系统结构体
-    bool m_own;                 // 是否拥有文件系统所有权
+    FsFileSystem* m_fs;         // 文件系统指针
     
     // 路径修正函数
     const char* FixPath(const char* path, char* out = nullptr) const;
@@ -152,8 +151,7 @@ public:
     bool MultiThreadTransfer(s64 size, bool read) override;
 
 private:
-    FsFileSystem m_fs;          // 文件系统结构体
-    bool m_own;                 // 是否拥有文件系统所有权
+    FsFileSystem* m_fs;         // 文件系统指针
     
     // 路径修正函数
     const char* FixPath(const char* path, char* out = nullptr) const;
@@ -196,7 +194,11 @@ private:
     haze::FsEntries m_fs_entries;                           // 文件系统入口列表
     mutable std::mutex m_mutex;                             // 互斥锁
     char transfer_filename[256];                             // 当前传输的文件名（用于Progress回调）
-
+    
+    // 速度计算相关变量（写入和读取共用）
+    u64 m_last_progress_time_ns;                            // 上次进度更新时间（纳秒）
+    s64 m_last_progress_offset;                             // 上次进度的偏移量
+    double m_current_speed_mbps;                            // 当前传输速度(MB/s)
 
     // 回调处理
     static void MtpCallback(const haze::CallbackData* data);

@@ -4,6 +4,7 @@
 #include <array>
 #include <utility>
 #include <algorithm>
+#include <cstring>
 
 namespace tj::gfx {
 
@@ -51,7 +52,7 @@ static constexpr std::array<std::pair<Colour, NVGcolor>, 12> COLOURS = {{
     {Colour::WHITE, { F(251.f), F(251.f), F(251.f), F(255.f) }},
     {Colour::CYAN, { F(0.f), F(255.f), F(200.f), F(255.f) }},
     {Colour::TEAL, { F(143.f), F(253.f), F(252.f), F(255.f) }},
-    {Colour::BLUE, { F(36.f), F(141.f), F(199.f), F(255.f) }},
+    {Colour::BLUE, { F(50.f), F(155.f), F(215.f), F(255.f) }}, // 稍微调亮蓝色 (Slightly brighten blue color)
     {Colour::LIGHT_BLUE, { F(26.f), F(188.f), F(252.f), F(255.f) }},
     {Colour::YELLOW, { F(255.f), F(177.f), F(66.f), F(255.f) }},
     {Colour::RED, { F(250.f), F(90.f), F(58.f), F(255.f) }}
@@ -414,6 +415,116 @@ void drawRoundedRectVarying(NVGcontext* vg, float x, float y, float w, float h, 
     nvgRoundedRectVarying(vg, x, y, w, h, radiusTopLeft, radiusTopRight, radiusBottomRight, radiusBottomLeft);
     nvgFillColor(vg, nvgRGB(red, green, blue));
     nvgFill(vg);
+}
+
+// 解析颜色标记字符串，返回对应的Colour枚举 (Parse color markup string and return corresponding Colour enum)
+static Colour parseColorFromString(const char* color_str, size_t len) {
+    if (len == 5 && strncmp(color_str, "BLACK", 5) == 0) return Colour::BLACK;
+    if (len == 11 && strncmp(color_str, "LIGHT_BLACK", 11) == 0) return Colour::LIGHT_BLACK;
+    if (len == 6 && strncmp(color_str, "SILVER", 6) == 0) return Colour::SILVER;
+    if (len == 9 && strncmp(color_str, "DARK_GREY", 9) == 0) return Colour::DARK_GREY;
+    if (len == 4 && strncmp(color_str, "GREY", 4) == 0) return Colour::GREY;
+    if (len == 5 && strncmp(color_str, "WHITE", 5) == 0) return Colour::WHITE;
+    if (len == 4 && strncmp(color_str, "CYAN", 4) == 0) return Colour::CYAN;
+    if (len == 4 && strncmp(color_str, "TEAL", 4) == 0) return Colour::TEAL;
+    if (len == 4 && strncmp(color_str, "BLUE", 4) == 0) return Colour::BLUE;
+    if (len == 10 && strncmp(color_str, "LIGHT_BLUE", 10) == 0) return Colour::LIGHT_BLUE;
+    if (len == 6 && strncmp(color_str, "YELLOW", 6) == 0) return Colour::YELLOW;
+    if (len == 3 && strncmp(color_str, "RED", 3) == 0) return Colour::RED;
+    return Colour::WHITE; // 默认颜色 (Default color)
+}
+
+// 查找字符在字符串中的位置 (Find character position in string)
+static const char* findChar(const char* str, const char* end, char c) {
+    while (str < end && *str != c) {
+        str++;
+    }
+    return (str < end) ? str : nullptr;
+}
+
+// 查找子字符串在字符串中的位置 (Find substring position in string)
+static const char* findSubstring(const char* str, const char* end, const char* pattern, size_t pattern_len) {
+    if (pattern_len == 0) return str;
+    const char* search_end = end - pattern_len + 1;
+    
+    for (const char* pos = str; pos < search_end; pos++) {
+        if (strncmp(pos, pattern, pattern_len) == 0) {
+            return pos;
+        }
+    }
+    return nullptr;
+}
+
+// 支持颜色标记的文本绘制函数实现 (Implementation of text drawing function with color markup support)
+// 格式：[color=COLOR]text[/color] 其中COLOR是颜色名称，如TEAL、RED等
+void drawTextBoxWithColorMarkup(NVGcontext* vg, float x, float y, float width, float size, float lineSpacing, const char* str, const char* end, int align, tj::gfx::Colour default_color) {
+    if (!str) return;
+    
+    nvgFontSize(vg, size);
+    nvgTextAlign(vg, align);
+    nvgTextLineHeight(vg, lineSpacing);
+    
+    const char* text_end = end ? end : str + strlen(str);
+    float current_x = x;
+    float current_y = y;
+    
+    const char* pos = str;
+    while (pos < text_end) {
+        // 查找颜色标记的开始 [color=
+        const char* color_tag_start = findSubstring(pos, text_end, "[color=", 7);
+        
+        if (!color_tag_start) {
+            // 没有更多标记，绘制剩余文本 (No more markup, draw remaining text)
+            nvgFillColor(vg, getColour(default_color));
+            nvgText(vg, current_x, current_y, pos, text_end);
+            break;
+        }
+        
+        // 绘制标记前的普通文本 (Draw normal text before markup)
+        if (color_tag_start > pos) {
+            nvgFillColor(vg, getColour(default_color));
+            float bounds[4];
+            nvgTextBounds(vg, current_x, current_y, pos, color_tag_start, bounds);
+            nvgText(vg, current_x, current_y, pos, color_tag_start);
+            current_x += bounds[2] - bounds[0] + 10.0f; // 添加1像素间距补偿 (Add 1 pixel spacing compensation)
+        }
+        
+        // 查找颜色名称的结束位置 ]
+        const char* color_name_start = color_tag_start + 7; // 跳过 "[color="
+        const char* color_name_end = findChar(color_name_start, text_end, ']');
+        if (!color_name_end) {
+            // 标记格式错误，绘制剩余文本 (Markup format error, draw remaining text)
+            nvgFillColor(vg, getColour(default_color));
+            nvgText(vg, current_x, current_y, color_tag_start, text_end);
+            break;
+        }
+        
+        // 查找结束标记 [/color]
+        const char* end_tag = findSubstring(color_name_end + 1, text_end, "[/color]", 8);
+        if (!end_tag) {
+            // 没有结束标记，绘制剩余文本 (No end tag, draw remaining text)
+            nvgFillColor(vg, getColour(default_color));
+            nvgText(vg, current_x, current_y, color_tag_start, text_end);
+            break;
+        }
+        
+        // 提取颜色名称和文本内容 (Extract color name and text content)
+        size_t color_name_len = color_name_end - color_name_start;
+        const char* content_start = color_name_end + 1; // 跳过 ']'
+        size_t content_len = end_tag - content_start;
+        
+        // 解析颜色并绘制文本 (Parse color and draw text)
+        Colour text_color = parseColorFromString(color_name_start, color_name_len);
+        nvgFillColor(vg, getColour(text_color));
+        
+        float bounds[4];
+        nvgTextBounds(vg, current_x, current_y, content_start, content_start + content_len, bounds);
+        nvgText(vg, current_x, current_y, content_start, content_start + content_len);
+        current_x += bounds[2] - bounds[0] + 10.0f; // 添加1像素间距补偿 (Add 1 pixel spacing compensation)
+        
+        // 移动到结束标记之后 (Move to after end tag)
+        pos = end_tag + 8; // 跳过 "[/color]"
+    }
 }
 
 } // namespace tj::gfx

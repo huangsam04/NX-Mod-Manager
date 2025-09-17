@@ -77,9 +77,7 @@ Result SdCardFileSystemProxy::GetEntryType(const char *path, FsDirEntryType *out
 }
 
 Result SdCardFileSystemProxy::CreateFile(const char* path, s64 size, u32 option) {
-    // 参考项目策略：创建文件但不预分配大小，避免大文件创建时卡死
-    // Reference project strategy: create file without pre-allocation to avoid hanging on large files
-    return fsFsCreateFile(m_fs, FixPath(path), 0, option);
+    return fsFsCreateFile(m_fs, FixPath(path), size, option);
 }
 
 Result SdCardFileSystemProxy::DeleteFile(const char* path) {
@@ -112,40 +110,40 @@ Result SdCardFileSystemProxy::WriteFile(FsFile *file, s64 off, const void *buf, 
     // Temporarily comment out chunked writing mechanism, use direct write to test repeated large file transfer freeze
     
     // 直接写入，不进行分块处理 / Direct write without chunking
-    // return fsFileWrite(file, off, buf, write_size, option);
+    return fsFileWrite(file, off, buf, write_size, option);
     
     
-    // 原分块写入代码 / Original chunked writing code
-    const u64 CHUNK_SIZE = 1*1024 * 1024; // 1MB分块大小，减少Switch Lite的调用次数限制 / 1MB chunk size to reduce call count limit on Switch Lite
-    const u8* data_ptr = static_cast<const u8*>(buf);
-    u64 remaining = write_size;
-    s64 current_offset = off;
-    Result result = 0;
+    // // 原分块写入代码 / Original chunked writing code
+    // const u64 CHUNK_SIZE = 1*1024 * 1024; // 1MB分块大小，减少Switch Lite的调用次数限制 / 1MB chunk size to reduce call count limit on Switch Lite
+    // const u8* data_ptr = static_cast<const u8*>(buf);
+    // u64 remaining = write_size;
+    // s64 current_offset = off;
+    // Result result = 0;
     
-    // 如果写入大小小于分块大小，直接写入
-    // If write size is smaller than chunk size, write directly
-    if (write_size <= CHUNK_SIZE) {
-        result = fsFileWrite(file, off, buf, write_size, option);
-        return result;
-    }
+    // // 如果写入大小小于分块大小，直接写入
+    // // If write size is smaller than chunk size, write directly
+    // if (write_size <= CHUNK_SIZE) {
+    //     result = fsFileWrite(file, off, buf, write_size, option);
+    //     return result;
+    // }
     
-    // 分块写入大文件 / Write large file in chunks
-    while (remaining > 0) {
-        u64 current_chunk_size = (remaining > CHUNK_SIZE) ? CHUNK_SIZE : remaining;
+    // // 分块写入大文件 / Write large file in chunks
+    // while (remaining > 0) {
+    //     u64 current_chunk_size = (remaining > CHUNK_SIZE) ? CHUNK_SIZE : remaining;
         
-        // 写入当前分块 / Write current chunk
-        result = fsFileWrite(file, current_offset, data_ptr, current_chunk_size, option);
-        if (R_FAILED(result)) {
-            return result; // 写入失败，返回错误 / Write failed, return error
-        }
+    //     // 写入当前分块 / Write current chunk
+    //     result = fsFileWrite(file, current_offset, data_ptr, current_chunk_size, option);
+    //     if (R_FAILED(result)) {
+    //         return result; // 写入失败，返回错误 / Write failed, return error
+    //     }
         
-        // 更新指针和偏移 / Update pointer and offset
-        data_ptr += current_chunk_size;
-        current_offset += current_chunk_size;
-        remaining -= current_chunk_size;
-    }
+    //     // 更新指针和偏移 / Update pointer and offset
+    //     data_ptr += current_chunk_size;
+    //     current_offset += current_chunk_size;
+    //     remaining -= current_chunk_size;
+    // }
     
-    return result;
+    // return result;
     
 }
 
@@ -191,12 +189,9 @@ bool SdCardFileSystemProxy::MultiThreadTransfer(s64 size, bool read) {
 // AddModProxy 实现 - 简单版本，参考libhaze示例
 //=============================================================================
 
-AddModProxy::AddModProxy() : m_own(false) {
-    // 使用SD卡文件系统，与SdCardFileSystemProxy相同的方式
-    FsFileSystem* sdfs = fsdevGetDeviceFileSystem("sdmc");
-    if (sdfs) {
-        m_fs = *sdfs;  // 解引用指针获取结构体
-    }
+AddModProxy::AddModProxy() {
+    // 获取SD卡文件系统，与SdCardFileSystemProxy相同的方式
+    m_fs = fsdevGetDeviceFileSystem("sdmc");
 }
 
 const char* AddModProxy::GetName() const {
@@ -237,37 +232,35 @@ const char* AddModProxy::FixPath(const char* path, char* out) const {
 
 // 空间信息
 Result AddModProxy::GetTotalSpace(const char *path, s64 *out) {
-    return fsFsGetTotalSpace(&m_fs, FixPath(path), out);
+    return fsFsGetTotalSpace(m_fs, FixPath(path), out);
 }
 
 Result AddModProxy::GetFreeSpace(const char *path, s64 *out) {
-    return fsFsGetFreeSpace(&m_fs, FixPath(path), out);
+    return fsFsGetFreeSpace(m_fs, FixPath(path), out);
 }
 
 Result AddModProxy::GetEntryType(const char *path, FsDirEntryType *out_entry_type) {
-    return fsFsGetEntryType(&m_fs, FixPath(path), out_entry_type);
+    return fsFsGetEntryType(m_fs, FixPath(path), out_entry_type);
 }
 
 // 文件操作
 Result AddModProxy::CreateFile(const char* path, s64 size, u32 option) {
     // 参考项目策略：创建文件但不预分配大小，避免大文件创建时卡死
     // Reference project strategy: create file without pre-allocation to avoid hanging on large files
-    return fsFsCreateFile(&m_fs, FixPath(path), 0, option);
+    return fsFsCreateFile(m_fs, FixPath(path), size, option);
 }
 
 Result AddModProxy::DeleteFile(const char* path) {
-    return fsFsDeleteFile(&m_fs, FixPath(path));
+    return fsFsDeleteFile(m_fs, FixPath(path));
 }
 
 Result AddModProxy::RenameFile(const char *old_path, const char *new_path) {
     char fixed_old[FS_MAX_PATH], fixed_new[FS_MAX_PATH];
-    // 使用与SD卡代理相同的文件系统指针，确保回调机制正常工作
-    FsFileSystem* sdfs = fsdevGetDeviceFileSystem("sdmc");
-    return fsFsRenameFile(sdfs, FixPath(old_path, fixed_old), FixPath(new_path, fixed_new));
+    return fsFsRenameFile(m_fs, FixPath(old_path, fixed_old), FixPath(new_path, fixed_new));
 }
 
 Result AddModProxy::OpenFile(const char *path, u32 mode, FsFile *out_file) {
-    return fsFsOpenFile(&m_fs, FixPath(path), mode, out_file);
+    return fsFsOpenFile(m_fs, FixPath(path), mode, out_file);
 }
 
 Result AddModProxy::GetFileSize(FsFile *file, s64 *out_size) {
@@ -285,30 +278,33 @@ Result AddModProxy::ReadFile(FsFile *file, s64 off, void *buf, u64 read_size, u3
 Result AddModProxy::WriteFile(FsFile *file, s64 off, const void *buf, u64 write_size, u32 option) {
     // 使用与SD卡代理相同的分块写入策略，避免大文件写入时卡死
     // Use the same chunked write strategy as SD card proxy to avoid hanging on large files
-    const u64 CHUNK_SIZE = 1024 * 1024; // 1MB 分块大小 / 1MB chunk size
+    // const u64 CHUNK_SIZE = 1024 * 1024; // 1MB 分块大小 / 1MB chunk size
     
-    Result result = 0;
-    u64 remaining = write_size;
-    s64 current_offset = off;
-    const u8* data_ptr = static_cast<const u8*>(buf);
+    // Result result = 0;
+    // u64 remaining = write_size;
+    // s64 current_offset = off;
+    // const u8* data_ptr = static_cast<const u8*>(buf);
     
-    // 分块写入大文件 / Write large file in chunks
-    while (remaining > 0) {
-        u64 current_chunk_size = (remaining > CHUNK_SIZE) ? CHUNK_SIZE : remaining;
+    // // 分块写入大文件 / Write large file in chunks
+    // while (remaining > 0) {
+    //     u64 current_chunk_size = (remaining > CHUNK_SIZE) ? CHUNK_SIZE : remaining;
         
-        // 写入当前分块 / Write current chunk
-        result = fsFileWrite(file, current_offset, data_ptr, current_chunk_size, option);
-        if (R_FAILED(result)) {
-            return result; // 写入失败，返回错误 / Write failed, return error
-        }
+    //     // 写入当前分块 / Write current chunk
+    //     result = fsFileWrite(file, current_offset, data_ptr, current_chunk_size, option);
+    //     if (R_FAILED(result)) {
+    //         return result; // 写入失败，返回错误 / Write failed, return error
+    //     }
         
-        // 更新指针和偏移 / Update pointer and offset
-        data_ptr += current_chunk_size;
-        current_offset += current_chunk_size;
-        remaining -= current_chunk_size;
-    }
+    //     // 更新指针和偏移 / Update pointer and offset
+    //     data_ptr += current_chunk_size;
+    //     current_offset += current_chunk_size;
+    //     remaining -= current_chunk_size;
+    // }
     
-    return result;
+    // return result;
+
+    // 直接写入，不进行分块处理 / Direct write without chunking
+    return fsFileWrite(file, off, buf, write_size, option);
 }
 
 void AddModProxy::CloseFile(FsFile *file) {
@@ -317,20 +313,20 @@ void AddModProxy::CloseFile(FsFile *file) {
 
 // 目录操作
 Result AddModProxy::CreateDirectory(const char* path) {
-    return fsFsCreateDirectory(&m_fs, FixPath(path));
+    return fsFsCreateDirectory(m_fs, FixPath(path));
 }
 
 Result AddModProxy::DeleteDirectoryRecursively(const char* path) {
-    return fsFsDeleteDirectoryRecursively(&m_fs, FixPath(path));
+    return fsFsDeleteDirectoryRecursively(m_fs, FixPath(path));
 }
 
 Result AddModProxy::RenameDirectory(const char *old_path, const char *new_path) {
     char fixed_old[FS_MAX_PATH], fixed_new[FS_MAX_PATH];
-    return fsFsRenameDirectory(&m_fs, FixPath(old_path, fixed_old), FixPath(new_path, fixed_new));
+    return fsFsRenameDirectory(m_fs, FixPath(old_path, fixed_old), FixPath(new_path, fixed_new));
 }
 
 Result AddModProxy::OpenDirectory(const char *path, u32 mode, FsDir *out_dir) {
-    return fsFsOpenDirectory(&m_fs, FixPath(path), mode, out_dir);
+    return fsFsOpenDirectory(m_fs, FixPath(path), mode, out_dir);
 }
 
 Result AddModProxy::ReadDirectory(FsDir *d, s64 *out_total_entries, size_t max_entries, FsDirectoryEntry *buf) {
@@ -353,12 +349,9 @@ bool AddModProxy::MultiThreadTransfer(s64 size, bool read) {
 // NxModManagerProxy 实现
 //=============================================================================
 
-NxModManagerProxy::NxModManagerProxy() : m_own(false) {
-    // 使用SD卡文件系统，与SdCardFileSystemProxy相同的方式
-    FsFileSystem* sdfs = fsdevGetDeviceFileSystem("sdmc");
-    if (sdfs) {
-        m_fs = *sdfs;  // 解引用指针获取结构体
-    }
+NxModManagerProxy::NxModManagerProxy() {
+    // 获取SD卡文件系统，与SdCardFileSystemProxy相同的方式
+    m_fs = fsdevGetDeviceFileSystem("sdmc");
 }
 
 const char* NxModManagerProxy::GetName() const {
@@ -399,37 +392,35 @@ const char* NxModManagerProxy::FixPath(const char* path, char* out) const {
 
 // 空间信息
 Result NxModManagerProxy::GetTotalSpace(const char *path, s64 *out) {
-    return fsFsGetTotalSpace(&m_fs, FixPath(path), out);
+    return fsFsGetTotalSpace(m_fs, FixPath(path), out);
 }
 
 Result NxModManagerProxy::GetFreeSpace(const char *path, s64 *out) {
-    return fsFsGetFreeSpace(&m_fs, FixPath(path), out);
+    return fsFsGetFreeSpace(m_fs, FixPath(path), out);
 }
 
 Result NxModManagerProxy::GetEntryType(const char *path, FsDirEntryType *out_entry_type) {
-    return fsFsGetEntryType(&m_fs, FixPath(path), out_entry_type);
+    return fsFsGetEntryType(m_fs, FixPath(path), out_entry_type);
 }
 
 // 文件操作
 Result NxModManagerProxy::CreateFile(const char* path, s64 size, u32 option) {
     // 参考项目策略：创建文件但不预分配大小，避免大文件创建时卡死
     // Reference project strategy: create file without pre-allocation to avoid hanging on large files
-    return fsFsCreateFile(&m_fs, FixPath(path), 0, option);
+    return fsFsCreateFile(m_fs, FixPath(path), size, option);
 }
 
 Result NxModManagerProxy::DeleteFile(const char* path) {
-    return fsFsDeleteFile(&m_fs, FixPath(path));
+    return fsFsDeleteFile(m_fs, FixPath(path));
 }
 
 Result NxModManagerProxy::RenameFile(const char *old_path, const char *new_path) {
     char fixed_old[FS_MAX_PATH], fixed_new[FS_MAX_PATH];
-    // 使用与SD卡代理相同的文件系统指针，确保回调机制正常工作
-    FsFileSystem* sdfs = fsdevGetDeviceFileSystem("sdmc");
-    return fsFsRenameFile(sdfs, FixPath(old_path, fixed_old), FixPath(new_path, fixed_new));
+    return fsFsRenameFile(m_fs, FixPath(old_path, fixed_old), FixPath(new_path, fixed_new));
 }
 
 Result NxModManagerProxy::OpenFile(const char *path, u32 mode, FsFile *out_file) {
-    return fsFsOpenFile(&m_fs, FixPath(path), mode, out_file);
+    return fsFsOpenFile(m_fs, FixPath(path), mode, out_file);
 }
 
 Result NxModManagerProxy::GetFileSize(FsFile *file, s64 *out_size) {
@@ -447,30 +438,33 @@ Result NxModManagerProxy::ReadFile(FsFile *file, s64 off, void *buf, u64 read_si
 Result NxModManagerProxy::WriteFile(FsFile *file, s64 off, const void *buf, u64 write_size, u32 option) {
     // 使用与SD卡代理相同的分块写入策略，避免大文件写入时卡死
     // Use the same chunked write strategy as SD card proxy to avoid hanging on large files
-    const u64 CHUNK_SIZE = 1024 * 1024; // 1MB 分块大小 / 1MB chunk size
+    // const u64 CHUNK_SIZE = 1024 * 1024; // 1MB 分块大小 / 1MB chunk size
     
-    Result result = 0;
-    u64 remaining = write_size;
-    s64 current_offset = off;
-    const u8* data_ptr = static_cast<const u8*>(buf);
+    // Result result = 0;
+    // u64 remaining = write_size;
+    // s64 current_offset = off;
+    // const u8* data_ptr = static_cast<const u8*>(buf);
     
-    // 分块写入大文件 / Write large file in chunks
-    while (remaining > 0) {
-        u64 current_chunk_size = (remaining > CHUNK_SIZE) ? CHUNK_SIZE : remaining;
+    // // 分块写入大文件 / Write large file in chunks
+    // while (remaining > 0) {
+    //     u64 current_chunk_size = (remaining > CHUNK_SIZE) ? CHUNK_SIZE : remaining;
         
-        // 写入当前分块 / Write current chunk
-        result = fsFileWrite(file, current_offset, data_ptr, current_chunk_size, option);
-        if (R_FAILED(result)) {
-            return result; // 写入失败，返回错误 / Write failed, return error
-        }
+    //     // 写入当前分块 / Write current chunk
+    //     result = fsFileWrite(file, current_offset, data_ptr, current_chunk_size, option);
+    //     if (R_FAILED(result)) {
+    //         return result; // 写入失败，返回错误 / Write failed, return error
+    //     }
         
-        // 更新指针和偏移 / Update pointer and offset
-        data_ptr += current_chunk_size;
-        current_offset += current_chunk_size;
-        remaining -= current_chunk_size;
-    }
+    //     // 更新指针和偏移 / Update pointer and offset
+    //     data_ptr += current_chunk_size;
+    //     current_offset += current_chunk_size;
+    //     remaining -= current_chunk_size;
+    // }
     
-    return result;
+    // return result;
+
+    // 直接写入，不进行分块处理 / Direct write without chunking
+    return fsFileWrite(file, off, buf, write_size, option);
 }
 
 void NxModManagerProxy::CloseFile(FsFile *file) {
@@ -479,20 +473,20 @@ void NxModManagerProxy::CloseFile(FsFile *file) {
 
 // 目录操作
 Result NxModManagerProxy::CreateDirectory(const char* path) {
-    return fsFsCreateDirectory(&m_fs, FixPath(path));
+    return fsFsCreateDirectory(m_fs, FixPath(path));
 }
 
 Result NxModManagerProxy::DeleteDirectoryRecursively(const char* path) {
-    return fsFsDeleteDirectoryRecursively(&m_fs, FixPath(path));
+    return fsFsDeleteDirectoryRecursively(m_fs, FixPath(path));
 }
 
 Result NxModManagerProxy::RenameDirectory(const char *old_path, const char *new_path) {
     char fixed_old[FS_MAX_PATH], fixed_new[FS_MAX_PATH];
-    return fsFsRenameDirectory(&m_fs, FixPath(old_path, fixed_old), FixPath(new_path, fixed_new));
+    return fsFsRenameDirectory(m_fs, FixPath(old_path, fixed_old), FixPath(new_path, fixed_new));
 }
 
 Result NxModManagerProxy::OpenDirectory(const char *path, u32 mode, FsDir *out_dir) {
-    return fsFsOpenDirectory(&m_fs, FixPath(path), mode, out_dir);
+    return fsFsOpenDirectory(m_fs, FixPath(path), mode, out_dir);
 }
 
 Result NxModManagerProxy::ReadDirectory(FsDir *d, s64 *out_total_entries, size_t max_entries, FsDirectoryEntry *buf) {
@@ -579,8 +573,8 @@ bool MtpManager::StartMtp() {
     ResetTransferInfo();
     
     // 初始化haze MTP服务
-    // 参数：回调函数、优先级、CPU核心、文件系统入口
-    bool result = haze::Initialize(MtpCallback, 0x20, 2, m_fs_entries);
+    // 参数：回调函数、文件系统入口、VID、PID标识、日志关闭
+    bool result = haze::Initialize(MtpCallback, m_fs_entries, 0x057e, 0x201d, false);
     
     if (result) {
         m_status = MtpStatus::Running;
@@ -696,10 +690,15 @@ void MtpManager::UpdateTransferInfo(const haze::CallbackData* data) {
                 }
                 strncpy(transfer_filename, basename, sizeof(transfer_filename) - 1);
                 transfer_filename[sizeof(transfer_filename) - 1] = '\0'; // 确保字符串结束
+                
+                // 初始化速度计算变量
+                m_last_progress_time_ns = armGetSystemTick();
+                m_last_progress_offset = 0;
+                m_current_speed_mbps = 0.0;
             }
             m_just_completed = false;
             m_transfer_in_progress = true;  // 设置传输进行标志
-            svcSleepThread(1000000);
+            // svcSleepThread(1000000);
             break;
             
         case haze::CallbackType_WriteBegin:
@@ -714,25 +713,50 @@ void MtpManager::UpdateTransferInfo(const haze::CallbackData* data) {
                 }
                 strncpy(transfer_filename, basename, sizeof(transfer_filename) - 1);
                 transfer_filename[sizeof(transfer_filename) - 1] = '\0'; // 确保字符串结束
+                
+                // 初始化速度计算变量
+                m_last_progress_time_ns = armGetSystemTick();
+                m_last_progress_offset = 0;
+                m_current_speed_mbps = 0.0;
             }
             
             m_just_completed = false;
             m_transfer_in_progress = true;  // 设置传输进行标志
-            svcSleepThread(1000000);
+            // svcSleepThread(1000000);
             break;
             
         case haze::CallbackType_ReadProgress:
-            // 读取进度更新 - 只显示速度和已读取大小
+            // 读取进度更新 - 显示速度和已读取大小
             {
                 if (data->progress.offset > 0) {
+                    // 获取当前时间
+                    u64 current_time_ns = armGetSystemTick();
+                    
+                    // 计算时间差（转换为秒）
+                    double time_diff_seconds = (double)(current_time_ns - m_last_progress_time_ns) / 19200000.0;
+                    
+                    // 如果时间间隔大于0.5秒，更新速度计算
+                    if (time_diff_seconds >= 0.5) {
+                        // 计算数据量差（字节）
+                        s64 data_diff_bytes = data->progress.offset - m_last_progress_offset;
+                        
+                        // 计算速度（MB/s）
+                        if (time_diff_seconds > 0) {
+                            m_current_speed_mbps = (double)data_diff_bytes / (1024.0 * 1024.0) / time_diff_seconds;
+                        }
+                        
+                        // 更新记录的时间和偏移量
+                        m_last_progress_time_ns = current_time_ns;
+                        m_last_progress_offset = data->progress.offset;
+                    }
+                    
                     // 计算已读取大小
                     double progress_mb = (double)data->progress.offset / (1024.0 * 1024.0);
-                    
                     
                     char progress_text[256];
                     snprintf(progress_text, sizeof(progress_text), 
                         MTP_READING_PROGRESS_TAG.c_str(), 
-                        progress_mb, transfer_filename);
+                        progress_mb, m_current_speed_mbps, transfer_filename);
                     m_transfer_status_text = std::string(progress_text);
                 }
             }
@@ -740,17 +764,37 @@ void MtpManager::UpdateTransferInfo(const haze::CallbackData* data) {
             break;
             
         case haze::CallbackType_WriteProgress:
-            // 写入进度更新 - 只显示速度和已写入大小
-
+            // 写入进度更新 - 显示速度和已写入大小
             {
                 if (data->progress.offset > 0) {
-                    // 计算已读取大小
+                    // 获取当前时间
+                    u64 current_time_ns = armGetSystemTick();
+                    
+                    // 计算时间差（转换为秒）
+                    double time_diff_seconds = (double)(current_time_ns - m_last_progress_time_ns) / 19200000.0;
+                    
+                    // 如果时间间隔大于0.5秒，更新速度计算
+                    if (time_diff_seconds >= 0.5) {
+                        // 计算数据量差（字节）
+                        s64 data_diff_bytes = data->progress.offset - m_last_progress_offset;
+                        
+                        // 计算速度（MB/s）
+                        if (time_diff_seconds > 0) {
+                            m_current_speed_mbps = (double)data_diff_bytes / (1024.0 * 1024.0) / time_diff_seconds;
+                        }
+                        
+                        // 更新记录的时间和偏移量
+                        m_last_progress_time_ns = current_time_ns;
+                        m_last_progress_offset = data->progress.offset;
+                    }
+                    
+                    // 计算已写入大小
                     double progress_mb = (double)data->progress.offset / (1024.0 * 1024.0);
                     
                     char progress_text[256];
                     snprintf(progress_text, sizeof(progress_text), 
                         MTP_WRITEING_PROGRESS_TAG.c_str(), 
-                        progress_mb, transfer_filename);
+                        progress_mb, m_current_speed_mbps, transfer_filename);
                     m_transfer_status_text = std::string(progress_text);
                 }
             }
@@ -769,7 +813,7 @@ void MtpManager::UpdateTransferInfo(const haze::CallbackData* data) {
             }
             m_just_completed = true;  // 设置刚完成标志，供UI检测
             m_transfer_in_progress = false;  // 清除传输进行标志
-            svcSleepThread(1000000); // 延迟50毫秒，让UI有时间显示
+            // svcSleepThread(1000000); // 延迟50毫秒，让UI有时间显示
             break;
             
         case haze::CallbackType_WriteEnd:
@@ -784,7 +828,7 @@ void MtpManager::UpdateTransferInfo(const haze::CallbackData* data) {
             }
             m_just_completed = true;  // 设置刚完成标志，供UI检测
             m_transfer_in_progress = false;  // 清除传输进行标志
-            svcSleepThread(1000000); // 延迟50毫秒，让UI有时间显示
+            // svcSleepThread(1000000); // 延迟50毫秒，让UI有时间显示
             break;
             
         case haze::CallbackType_OpenSession:
@@ -793,26 +837,21 @@ void MtpManager::UpdateTransferInfo(const haze::CallbackData* data) {
             if (m_transfer_status_text.empty()) {
                 m_transfer_status_text = MTP_STATUS_CONNECTED_TEXT;
             }
-            svcSleepThread(1000000); // 延迟30毫秒，让UI有时间显示
+            // svcSleepThread(1000000); // 延迟30毫秒，让UI有时间显示
             break;
             
         case haze::CallbackType_CloseSession:
             // USB连接断开时的处理 (Handle USB disconnection)
             m_is_connected = false;
             m_transfer_status_text = MTP_STATUS_DISCONNECTED_TEXT;
-            svcSleepThread(1000000); // 延迟50毫秒，让UI有时间显示
+            // svcSleepThread(1000000); // 延迟50毫秒，让UI有时间显示
             break;
             
         case haze::CallbackType_CreateFile:
-            // 创建文件操作，只显示文件名（不含路径）
-            // {
-            //     std::string filename = std::string(data->file.filename);
-            //     size_t pos = filename.find_last_of('/');
-            //     if (pos != std::string::npos) {
-            //         filename = filename.substr(pos + 1);
-            //     }
-            //     m_transfer_status_text = "[创建文件]：" + filename;
-            // }
+            
+                
+            m_transfer_status_text = MTP_CREATE_FILE_TAG + std::string(data->file.filename);
+            
             // svcSleepThread(2000000);
             break;
             
@@ -826,7 +865,7 @@ void MtpManager::UpdateTransferInfo(const haze::CallbackData* data) {
                 }
                 m_transfer_status_text = MTP_DELETE_FILE_TAG + filename;
             }
-            svcSleepThread(1000000); // 延迟50毫秒，让UI有时间显示
+            // svcSleepThread(1000000); // 延迟50毫秒，让UI有时间显示
             break;
             
         case haze::CallbackType_RenameFile:
@@ -847,7 +886,7 @@ void MtpManager::UpdateTransferInfo(const haze::CallbackData* data) {
                 
                 m_transfer_status_text = MTP_RENAME_FILE_TAG + old_filename + " -> " + new_filename;
             }
-            svcSleepThread(1000000); // 延迟50毫秒，让UI有时间显示
+            // svcSleepThread(1000000); // 延迟50毫秒，让UI有时间显示
             break;
             
         case haze::CallbackType_CreateFolder:
@@ -860,7 +899,7 @@ void MtpManager::UpdateTransferInfo(const haze::CallbackData* data) {
                 }
                 m_transfer_status_text = MTP_CREATE_FOLDER_TAG + foldername;
             }
-            svcSleepThread(1000000); // 延迟50毫秒，让UI有时间显示
+            // svcSleepThread(1000000); // 延迟50毫秒，让UI有时间显示
             break;
             
         case haze::CallbackType_DeleteFolder:
@@ -873,7 +912,7 @@ void MtpManager::UpdateTransferInfo(const haze::CallbackData* data) {
                 }
                 m_transfer_status_text = MTP_DELETE_FOLDER_TAG + foldername;
             }
-            svcSleepThread(1000000); // 延迟50毫秒，让UI有时间显示
+            // svcSleepThread(1000000); // 延迟50毫秒，让UI有时间显示
             break;
             
         case haze::CallbackType_RenameFolder:
@@ -894,7 +933,7 @@ void MtpManager::UpdateTransferInfo(const haze::CallbackData* data) {
                 
                 m_transfer_status_text = MTP_RENAME_FOLDER_TAG + old_foldername + " -> " + new_foldername;
             }
-            svcSleepThread(1000000); // 延迟50毫秒，让UI有时间显示
+            // svcSleepThread(1000000); // 延迟50毫秒，让UI有时间显示
             break;
     }
 }

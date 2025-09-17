@@ -147,6 +147,7 @@ extern std::string MTP_WRITEING_DONE_TAG;
 extern std::string MTP_READING_DONE_TAG;
 extern std::string MTP_WRITEING_PROGRESS_TAG;
 extern std::string MTP_READING_PROGRESS_TAG;
+extern std::string MTP_CREATE_FILE_TAG;
 extern std::string LIST_DIALOG_MTP;
 
 

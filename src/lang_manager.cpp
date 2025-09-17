@@ -147,6 +147,7 @@ std::string MTP_WRITEING_DONE_TAG;
 std::string MTP_READING_DONE_TAG;
 std::string MTP_WRITEING_PROGRESS_TAG;
 std::string MTP_READING_PROGRESS_TAG;
+std::string MTP_CREATE_FILE_TAG;
 std::string LIST_DIALOG_MTP;
 
 namespace tj {
@@ -464,6 +465,7 @@ bool LangManager::loadLanguage(const std::string& langCode) {
             {"MTP_WRITEING_PROGRESS_TAG", std::ref(MTP_WRITEING_PROGRESS_TAG)},
             {"MTP_READING_PROGRESS_TAG", std::ref(MTP_READING_PROGRESS_TAG)},
             {"LIST_DIALOG_MTP", std::ref(LIST_DIALOG_MTP)},
+            {"MTP_CREATE_FILE_TAG", std::ref(MTP_CREATE_FILE_TAG)},
             
 
             

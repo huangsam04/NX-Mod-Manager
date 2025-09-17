@@ -99,6 +99,9 @@ void drawTextBox(NVGcontext* vg, float x, float y, float width, float size, floa
 void drawTextBoxCentered(NVGcontext* vg, float x, float y, float width, float height, float size, float lineSpacing, const char* str, const char* end, Colour c);
 void drawTextBoxCentered(NVGcontext* vg, float x, float y, float width, float height, float size, float lineSpacing, const char* str, const char* end, int align, Colour c);
 
+// 支持颜色标记的文本绘制函数声明 (Function declaration for text drawing with color markup support)
+void drawTextBoxWithColorMarkup(NVGcontext* vg, float x, float y, float width, float size, float lineSpacing, const char* str, const char* end, int align, Colour default_color);
+
 // 为组合按钮创建便捷构造函数
 inline pair2 make_pair2(Button button, const char* text) {
     return pair2{std::variant<Button, std::pair<Button, Button>>{button}, text};
