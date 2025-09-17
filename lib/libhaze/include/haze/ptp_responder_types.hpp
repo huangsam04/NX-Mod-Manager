@@ -25,10 +25,6 @@ namespace haze {
         .bInterfaceProtocol = 0x01,
     };
 
-    /* This is a VID:PID recognized by libmtp. */
-    constexpr u16 SwitchMtpIdVendor  = 0x057e;
-    constexpr u16 SwitchMtpIdProduct = 0x201d;
-
     /* Constants used for MTP GetDeviceInfo response. */
     constexpr u16 MtpStandardVersion       = 100;
     constexpr u32 MtpVendorExtensionId     = 6;
@@ -155,7 +151,7 @@ namespace haze {
         .keywords               = "",
     };
 
-    constexpr u32 UsbBulkPacketBufferSize = 4_MB;
+    constexpr u32 UsbBulkPacketBufferSize = 64_KB;
     constexpr s64 DirectoryReadSize = 128;
 
     struct PtpBuffers {
