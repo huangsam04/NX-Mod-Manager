@@ -1031,8 +1031,9 @@ bool ModManager::installModFromZipDirect(const std::string& zip_path,
                                         std::stop_token stop_token) {
     
     
-    
-    progress_callback(0, 0, CALCULATE_FILES, false, 0.0f);
+    if (progress_callback) {
+        progress_callback(0, 0, CALCULATE_FILES, false, 0.0f);
+    }
 
     // 初始化ZIP读取器检查内部结构
     mz_zip_archive zip_archive;
@@ -1073,7 +1074,23 @@ bool ModManager::installModFromZipDirect(const std::string& zip_path,
         
         // 收集所有需要创建的目录路径（包括所有父目录层次）- 优化版本
         if (!mz_zip_reader_is_file_a_directory(&zip_archive, i)) {
-            files_total++;
+            
+            // 检查目标文件是否已存在，如果存在则立即报错并停止
+            std::string target_file_path;
+            target_file_path.reserve(target_directory_zip.length() + filename.length());
+            target_file_path = target_directory_zip;
+            target_file_path += filename;
+            
+            // 使用access()检查文件是否存在（F_OK表示检查文件存在性）
+            if (access(target_file_path.c_str(), F_OK) == 0) {
+                // 文件已存在，关闭ZIP读取器并报错
+                mz_zip_reader_end(&zip_archive);
+                if (error_callback) {
+                    error_callback("文件冲突：目标文件已存在 - " + target_file_path);
+                }
+                return false;
+            }
+            
             size_t last_slash = filename.find_last_of('/');
             if (last_slash != std::string::npos) {
                 // 使用string_view避免字符串拷贝，优化路径解析性能
@@ -1105,7 +1122,16 @@ bool ModManager::installModFromZipDirect(const std::string& zip_path,
                   full_dir_path.append(relative_dir_data, relative_dir_length);
                   all_directories.push_back(std::move(full_dir_path));
             }
+            
+            files_total++;
+
+            // 每500个文件更新一次进度
+            if (progress_callback && files_total % 500 == 0 ) {
+                progress_callback(0, files_total, CALCULATE_FILES, false, 0.0f);
+            }
+
         }
+
     }
 
     
