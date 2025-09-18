@@ -235,6 +235,13 @@ public:
     std::string Removemodechecklegality(const std::string& mod_dir_path);
     bool Removemodesingezipmod(const std::string& mod_zip_path);
     bool Removegameandallmods(const std::string& game_file_path,ErrorCallback error_callback);
+
+    std::vector<std::string> GetAllInstalledModDirPaths(const std::string& game_file_path);
+    std::string GetModJsonName(const std::string& mod_dir_path);
+
+    void GetConflictingModNames(const std::string& game_file_path,const std::string& conflicting_file_Path,
+                                ProgressCallback progress_callback,ErrorCallback error_callback,std::stop_token stop_token);
+
 private:
     // 缓存的目标文件路径列表，用于卸载时直接删除 (Cached target file paths for direct deletion during uninstall)
     std::vector<std::string> cached_target_files;

@@ -505,4 +505,69 @@ bool JsonManager::WriteJsonFile(const std::string& json_path, yyjson_mut_doc* mu
     return written == json_len;
 }
 
+// 获取嵌套JSON键的值，如果根键或嵌套键不存在则返回根键
+// Get nested JSON key value, return root key if root key or nested key doesn't exist
+std::string JsonManager::GetNestedJsonValue(const std::string& json_path, const std::string& root_key, const std::string& nested_key) {
+    // 确保JSON文件存在 (Ensure JSON file exists)
+    if (!EnsureJsonFileExists(json_path)) {
+        return root_key; // 文件不存在，返回根键 (File doesn't exist, return root key)
+    }
+    
+    // 打开文件进行读取 (Open file for reading)
+    FILE* file = fopen(json_path.c_str(), "rb");
+    if (!file) {
+        return root_key; // 无法打开文件，返回根键 (Cannot open file, return root key)
+    }
+    
+    // 获取文件大小 (Get file size)
+    fseek(file, 0, SEEK_END);
+    size_t file_size = ftell(file);
+    fseek(file, 0, SEEK_SET);
+    
+    // 读取文件内容 (Read file content)
+    char* json_data = (char*)malloc(file_size + 1);
+    if (!json_data) {
+        fclose(file);
+        return root_key; // 内存分配失败，返回根键 (Memory allocation failed, return root key)
+    }
+    
+    fread(json_data, 1, file_size, file);
+    json_data[file_size] = '\0';
+    fclose(file);
+    
+    // 解析JSON (Parse JSON)
+    yyjson_doc* doc = yyjson_read(json_data, file_size, 0);
+    free(json_data);
+    if (!doc) {
+        return root_key; // JSON解析失败，返回根键 (JSON parsing failed, return root key)
+    }
+    
+    yyjson_val* root = yyjson_doc_get_root(doc);
+    if (!root || !yyjson_is_obj(root)) {
+        yyjson_doc_free(doc);
+        return root_key; // 根对象无效，返回根键 (Invalid root object, return root key)
+    }
+    
+    // 查找根键对应的对象 (Find object for root key)
+    yyjson_val* root_obj = yyjson_obj_get(root, root_key.c_str());
+    if (!root_obj || !yyjson_is_obj(root_obj)) {
+        yyjson_doc_free(doc);
+        return root_key; // 根键不存在或不是对象，返回根键 (Root key doesn't exist or is not an object, return root key)
+    }
+    
+    // 查找嵌套键对应的值 (Find value for nested key)
+    yyjson_val* nested_val = yyjson_obj_get(root_obj, nested_key.c_str());
+    if (!nested_val || !yyjson_is_str(nested_val)) {
+        yyjson_doc_free(doc);
+        return root_key; // 嵌套键不存在或不是字符串，返回根键 (Nested key doesn't exist or is not a string, return root key)
+    }
+    
+    // 获取嵌套键的字符串值 (Get string value of nested key)
+    const char* nested_str = yyjson_get_str(nested_val);
+    std::string result = nested_str ? std::string(nested_str) : root_key;
+    
+    yyjson_doc_free(doc);
+    return result;
+}
+
 } // namespace tj

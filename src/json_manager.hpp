@@ -81,6 +81,16 @@ public:
      */
     static bool RenameOrCreateJsonRootKey(const std::string& json_path, const std::string& old_root_key, const std::string& new_root_key);
 
+    /**
+     * 获取嵌套JSON键的值，如果根键或嵌套键不存在则返回根键
+     * Get nested JSON key value, return root key if root key or nested key doesn't exist
+     * @param json_path JSON文件路径 (JSON file path)
+     * @param root_key 根键名 (Root key name)
+     * @param nested_key 嵌套键名 (Nested key name)
+     * @return 嵌套键的值或根键名 (Nested key value or root key name)
+     */
+    static std::string GetNestedJsonValue(const std::string& json_path, const std::string& root_key, const std::string& nested_key);
+
     
 
     /**
