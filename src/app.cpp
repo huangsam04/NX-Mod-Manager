@@ -5595,6 +5595,12 @@ void App::ChangeModName() {
         // 重命名成功，更新模组信息
         current_mod.MOD_STATE = !current_mod.MOD_STATE;
         current_mod.MOD_PATH = new_path;
+    } else {
+        newHideDialog();
+        std::string aaaa = "为安装";
+        if (current_mod.MOD_STATE) aaaa = "已安装\n";
+        newShowDialogConfirm(aaaa+"重命名目录失败" + current_path + " -> " + new_path+"error："+strerror(errno));
+
     }
     // 如果重命名失败，不做任何更改
 }

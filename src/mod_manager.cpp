@@ -1193,8 +1193,9 @@ bool ModManager::installModFromFolder(const std::string& folder_path,
 
     
 
-
-    progress_callback(0, 0, CALCULATE_FILES, false, 0.0f);
+    if (progress_callback) {
+        progress_callback(0, 0, CALCULATE_FILES, false, 0.0f);
+    }
 
     // 检查MOD结构是否有效 (Check if MOD structure is valid)
     DIR* dir = opendir(folder_path.c_str());
@@ -1247,13 +1248,15 @@ bool ModManager::installModFromFolder(const std::string& folder_path,
     std::vector<std::string> directories_to_create; // 存储需要创建的目录路径 (Store directory paths to be created)
     size_t total_files = 0;
     size_t global_file_count = 0; // 全局累计计数器 (Global cumulative counter)
-    
+    bool countFuncErr = false;
     // 递归统计文件的函数 (Recursive function to count files)
     std::function<size_t(const std::string&, const std::string&)> count_files = 
         [&](const std::string& source_path, const std::string& target_path) -> size_t {
         size_t local_count = 0; // 当前目录的文件数 (File count for current directory)
         DIR* dir = opendir(source_path.c_str());
         if (!dir) {
+            // 标记有错误
+            countFuncErr = true;
             // 无法打开源目录，输出错误信息用于诊断 (Cannot open source directory, output error for diagnosis)
             if (error_callback) {
                 error_callback(CANT_OPEN_FILE + source_path + ", errno: " + std::to_string(errno));
@@ -1287,6 +1290,17 @@ bool ModManager::installModFromFolder(const std::string& folder_path,
                 // 递归处理子目录 (Recursively process subdirectory)
                 local_count += count_files(source_file, target_file);
             } else if (entry->d_type == DT_REG) {
+                // 使用access()检查文件是否存在（F_OK表示检查文件存在性）
+                if (access(target_file.c_str(), F_OK) == 0) {
+                    // folder_path中提取/mods2/游戏名/id路径（倒着找第1个）
+                    std::string game_file_path = folder_path.substr(0, folder_path.rfind('/'));
+                    // 检查是哪个mod冲突
+                    GetConflictingModNames(game_file_path, target_file, progress_callback, error_callback, stop_token);
+                    // 标记有错误
+                    countFuncErr = true;
+                    // 存在冲突，停止循环
+                    break;
+                }
                 // 获取文件大小并缓存文件信息 (Get file size and cache file info)
                 struct stat file_stat;
                 if (stat(source_file.c_str(), &file_stat) == 0) {
@@ -1296,10 +1310,12 @@ bool ModManager::installModFromFolder(const std::string& folder_path,
                     global_file_count++; // 增加全局计数器 (Increment global counter)
                 } else {
                     // 处理获取文件信息失败的情况 (Handle file info retrieval failure)
+                    // 标记有错误
+                    countFuncErr = true;
                     if (error_callback) {
                         error_callback("Cannot get file info: " + source_file + ", errno: " + std::to_string(errno));
                     }
-                    return false;
+                    break;
                 }
                 
                 // 每10个文件更新一次进度，使用全局计数器 (Update progress every 10 files using global counter)
@@ -1351,6 +1367,11 @@ bool ModManager::installModFromFolder(const std::string& folder_path,
         progress_callback(0, global_file_count, CALCULATE_FILES, false, 0.0f);
     }
     
+    if (countFuncErr) {
+        // 统计函数报错，早于数量检测，避免错误信息被覆盖
+        return false;
+    }
+
     if (total_files == 0) {
         if (error_callback) {
             error_callback(FILE_NONE);
@@ -2169,11 +2190,10 @@ bool ModManager::Removegameandallmods(const std::string& game_file_path,ErrorCal
     return false;
 }
 
-// 获取所有已安装的mod目录路径，game_file_path路径示例：/mods2/游戏名字/ID/mod_name$，$代表已安装
+// 获取所有已安装的mod目录路径，路径示例：/mods2/游戏名字/ID/mod_name$，$代表已安装
 std::vector<std::string> ModManager::GetAllInstalledModDirPaths(const std::string& game_file_path) {
 
     std::vector<std::string> directories{};
-    // 遍历FILE_PATH路径下所有目录，生成包含所有目录的数组
     
     DIR* dir = opendir(game_file_path.c_str());
     if (dir != nullptr) {
