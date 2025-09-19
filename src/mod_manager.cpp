@@ -1085,10 +1085,10 @@ bool ModManager::installModFromZipDirect(const std::string& zip_path,
             if (access(target_file_path.c_str(), F_OK) == 0) {
                 // 文件已存在，关闭ZIP读取器并报错
                 mz_zip_reader_end(&zip_archive);
-                // 从zip_path中提取/mods2/游戏名/id路径（倒着找第二个/）
-                std::string game_file_path = zip_path.substr(0, zip_path.rfind('/', zip_path.rfind('/') - 1));
+                // 从zip_path中提取/mods2/游戏名/id/mod名字路径
+                std::string mod_dir_path = zip_path.substr(0, zip_path.rfind('/'));
                 // 检查是哪个mod冲突
-                GetConflictingModNames(game_file_path, target_file_path, progress_callback, error_callback, stop_token);
+                GetConflictingModNames(mod_dir_path, target_file_path, progress_callback, error_callback, stop_token);
                 return false;
             }
             
@@ -1250,8 +1250,8 @@ bool ModManager::installModFromFolder(const std::string& folder_path,
     size_t global_file_count = 0; // 全局累计计数器 (Global cumulative counter)
     bool countFuncErr = false;
     // 递归统计文件的函数 (Recursive function to count files)
-    std::function<size_t(const std::string&, const std::string&)> count_files = 
-        [&](const std::string& source_path, const std::string& target_path) -> size_t {
+    std::function<size_t(std::string&, std::string&, std::stop_token stop_token)> count_files = 
+        [&](std::string& source_path, std::string& target_path, std::stop_token stop_token) -> size_t {
         size_t local_count = 0; // 当前目录的文件数 (File count for current directory)
         DIR* dir = opendir(source_path.c_str());
         if (!dir) {
@@ -1263,9 +1263,24 @@ bool ModManager::installModFromFolder(const std::string& folder_path,
             }
             return 0;
         }
-        
+        // 检查是否有错误发生，立即跳出递归 (Check if error occurred, immediately exit recursion)
+        if (countFuncErr) {
+            closedir(dir);
+            return 0;
+        }
         struct dirent* entry;
         while ((entry = readdir(dir)) != nullptr) {
+            // 检查是否被请求停止 (Check if stop requested)
+            if (stop_token.stop_requested()) {
+                return 0;
+            }
+            
+            // 检查是否有错误发生，立即跳出递归 (Check if error occurred, immediately exit recursion)
+            if (countFuncErr) {
+                closedir(dir);
+                return 0;
+            }
+
             if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0) {
                 continue;
             }
@@ -1283,23 +1298,28 @@ bool ModManager::installModFromFolder(const std::string& folder_path,
             target_file += '/';
             target_file += entry->d_name;
             
+            
             // 直接使用d_type判断文件类型，避免stat()系统调用 (Use d_type directly to determine file type, avoiding stat() system call)
             if (entry->d_type == DT_DIR) {
                 // 收集目录路径，延迟创建 (Collect directory path for delayed creation)
                 directories_to_create.push_back(target_file);
                 // 递归处理子目录 (Recursively process subdirectory)
-                local_count += count_files(source_file, target_file);
+                local_count += count_files(source_file, target_file, stop_token);
+                // 检查递归调用后是否有错误，立即跳出 (Check if error occurred after recursive call, immediately exit)
+                if (countFuncErr) {
+                    closedir(dir);
+                    return 0;
+                }
             } else if (entry->d_type == DT_REG) {
                 // 使用access()检查文件是否存在（F_OK表示检查文件存在性）
                 if (access(target_file.c_str(), F_OK) == 0) {
-                    // folder_path中提取/mods2/游戏名/id路径（倒着找第1个）
-                    std::string game_file_path = folder_path.substr(0, folder_path.rfind('/'));
                     // 检查是哪个mod冲突
-                    GetConflictingModNames(game_file_path, target_file, progress_callback, error_callback, stop_token);
+                    GetConflictingModNames(folder_path, target_file, progress_callback, error_callback, stop_token);
                     // 标记有错误
                     countFuncErr = true;
                     // 存在冲突，停止循环
-                    break;
+                    closedir(dir);
+                    return 0;
                 }
                 // 获取文件大小并缓存文件信息 (Get file size and cache file info)
                 struct stat file_stat;
@@ -1315,7 +1335,8 @@ bool ModManager::installModFromFolder(const std::string& folder_path,
                     if (error_callback) {
                         error_callback("Cannot get file info: " + source_file + ", errno: " + std::to_string(errno));
                     }
-                    break;
+                    closedir(dir);
+                    return 0;
                 }
                 
                 // 每10个文件更新一次进度，使用全局计数器 (Update progress every 10 files using global counter)
@@ -1331,21 +1352,7 @@ bool ModManager::installModFromFolder(const std::string& folder_path,
         
         return local_count;
     };
-    
-    // 统计exefs_patches目录 (Count exefs_patches directory) - 优化路径拼接
-    if (has_exefs_patches) {
-        std::string exefs_path;
-        exefs_path.reserve(folder_path.length() + 16); // "/exefs_patches" = 15 chars + 1
-        exefs_path = folder_path;
-        exefs_path += "/exefs_patches";
-        
-        std::string target_exefs;
-        target_exefs.reserve(target_directory_zip.length() + 15); // "exefs_patches" = 14 chars + 1
-        target_exefs = target_directory_zip;
-        target_exefs += "exefs_patches";
-        
-        total_files += count_files(exefs_path, target_exefs);
-    }
+
     
     // 统计contents目录 (Count contents directory) - 优化路径拼接
     if (has_contents) {
@@ -1359,18 +1366,41 @@ bool ModManager::installModFromFolder(const std::string& folder_path,
         target_contents = target_directory_zip;
         target_contents += "contents";
         
-        total_files += count_files(contents_path, target_contents);
+        total_files += count_files(contents_path, target_contents, stop_token);
     }
-    
-    // 统计完成后显示最终的文件总数 (Show final total file count after counting)
-    if (progress_callback && global_file_count > 0) {
-        progress_callback(0, global_file_count, CALCULATE_FILES, false, 0.0f);
+
+    if (countFuncErr) {
+        // 统计函数报错，早于数量检测，避免错误信息被覆盖
+        return false;
+    }
+
+    // 统计exefs_patches目录 (Count exefs_patches directory) - 优化路径拼接
+    if (has_exefs_patches) {
+        std::string exefs_path;
+        exefs_path.reserve(folder_path.length() + 16); // "/exefs_patches" = 15 chars + 1
+        exefs_path = folder_path;
+        exefs_path += "/exefs_patches";
+        
+        std::string target_exefs;
+        target_exefs.reserve(target_directory_zip.length() + 15); // "exefs_patches" = 14 chars + 1
+        target_exefs = target_directory_zip;
+        target_exefs += "exefs_patches";
+        
+        total_files += count_files(exefs_path, target_exefs, stop_token);
     }
     
     if (countFuncErr) {
         // 统计函数报错，早于数量检测，避免错误信息被覆盖
         return false;
     }
+
+
+    // 统计完成后显示最终的文件总数 (Show final total file count after counting)
+    if (progress_callback && global_file_count > 0) {
+        progress_callback(0, global_file_count, CALCULATE_FILES, false, 0.0f);
+    }
+    
+    
 
     if (total_files == 0) {
         if (error_callback) {
@@ -2190,8 +2220,8 @@ bool ModManager::Removegameandallmods(const std::string& game_file_path,ErrorCal
     return false;
 }
 
-// 获取所有已安装的mod目录路径，路径示例：/mods2/游戏名字/ID/mod_name$，$代表已安装
-std::vector<std::string> ModManager::GetAllInstalledModDirPaths(const std::string& game_file_path) {
+// 获取所有mod目录路径，路径示例：/mods2/游戏名字/ID/mod_name$，$代表已安装
+std::vector<std::string> ModManager::GetAllModDirPaths(const std::string& game_file_path) {
 
     std::vector<std::string> directories{};
     
@@ -2208,9 +2238,9 @@ std::vector<std::string> ModManager::GetAllInstalledModDirPaths(const std::strin
                 // 检查entry->d_name的最后一位字符是否是'$'(已安装)
                 std::string dir_name = entry->d_name;
                 if (!dir_name.empty() && dir_name.back() == '$') {
-                    
-                    directories.push_back(game_file_path + "/" + dir_name);
-                }
+                    // 向容器开头插入元素，确保先检查已安装的mod
+                    directories.insert(directories.begin(), game_file_path + "/" + dir_name);
+                } else directories.push_back(game_file_path + "/" + dir_name);
                 
             }
         }
@@ -2244,7 +2274,7 @@ std::string ModManager::GetModJsonName(const std::string& mod_dir_path) {
 
 
 // 获取具体冲突的mod名字，最终通过错误回调，反馈给用户
-void ModManager::GetConflictingModNames(const std::string& game_file_path,const std::string& conflicting_file_Path,
+void ModManager::GetConflictingModNames(const std::string& mod_dir_path,const std::string& conflicting_file_Path,
                                         ProgressCallback progress_callback,ErrorCallback error_callback,std::stop_token stop_token) {
 
     if (stop_token.stop_requested()) {
@@ -2255,21 +2285,32 @@ void ModManager::GetConflictingModNames(const std::string& game_file_path,const 
         progress_callback(0, 0, "正在检查冲突的MOD...", false, 0.0f);
     }
 
+    // 从/mods2/游戏名/ID/模组名固定格式提取/mods2/游戏名/ID
+    std::string game_file_path = mod_dir_path.substr(0, mod_dir_path.rfind('/'));
+
     // 获取所有已安装的mod目录路径
-    std::vector<std::string> installed_mod_paths = GetAllInstalledModDirPaths(game_file_path);
-    int installed_mod_count = static_cast<int>(installed_mod_paths.size());
+    std::vector<std::string> installed_mod_paths = GetAllModDirPaths(game_file_path);
     
-    if (progress_callback) {
-        progress_callback(0, installed_mod_count, "正在检查冲突的MOD...", false, 0.0f);
-    }
+    // 从向量中删除所有等于mod_dir_path的元素，不检测当前正在安装的这个MOD
+    installed_mod_paths.erase(
+        std::remove(installed_mod_paths.begin(), installed_mod_paths.end(), mod_dir_path),
+        installed_mod_paths.end()
+    );
     
     // 检查是否为空
     if (installed_mod_paths.empty()) {
         if (error_callback) {
-            error_callback("未发现冲突的MOD，可能是用户手动安装的MOD冲突！");
+            error_callback("获取到的列表为空，未发现冲突的MOD，可能是用户手动安装的MOD冲突！");
         }
         return;
     }
+
+    int installed_mod_count = static_cast<int>(installed_mod_paths.size());
+
+    if (progress_callback) {
+        progress_callback(0, installed_mod_count, "正在检查冲突的MOD...", false, 0.0f);
+    }
+    
 
     // 分离出/contents/XXXXXX
     std::string contents_path = conflicting_file_Path;
@@ -2346,7 +2387,7 @@ void ModManager::GetConflictingModNames(const std::string& game_file_path,const 
 
     // 所有已安装mod中未找到冲突文件
     if (error_callback) {
-        error_callback("未发现冲突的MOD，可能是用户手动安装的MOD冲突！");
+        error_callback("循环结束为发现，未发现冲突的MOD，可能是用户手动安装的MOD冲突！");
     }
 
 }

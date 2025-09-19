@@ -236,10 +236,10 @@ public:
     bool Removemodesingezipmod(const std::string& mod_zip_path);
     bool Removegameandallmods(const std::string& game_file_path,ErrorCallback error_callback);
 
-    std::vector<std::string> GetAllInstalledModDirPaths(const std::string& game_file_path);
+    std::vector<std::string> GetAllModDirPaths(const std::string& game_file_path);
     std::string GetModJsonName(const std::string& mod_dir_path);
 
-    void GetConflictingModNames(const std::string& game_file_path,const std::string& conflicting_file_Path,
+    void GetConflictingModNames(const std::string& mod_dir_path,const std::string& conflicting_file_Path,
                                 ProgressCallback progress_callback,ErrorCallback error_callback,std::stop_token stop_token);
 
 private:
