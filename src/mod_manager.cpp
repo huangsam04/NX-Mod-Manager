@@ -63,12 +63,15 @@ bool ModManager::extractMod(const std::string& zip_path,
     }
     
     bool overall_success = true;
-    
+    // 用于存储已复制的文件路径，即使这个文件没有真的被复制。
+    std::vector<std::string> extracted_files;
     // 提取每个文件，直接按顺序写入 (Extract each file, write directly in sequence)
     for (int i = 0; i < num_files; i++) {
         // 检查是否需要停止 (Check if stop is requested)
         if (stop_token.stop_requested()) {
             free(aligned_buffer);
+            // 先清理已安装内容
+            cleanupCopiedFilesAndDirectories(extracted_files,progress_callback,files_total);
             return false;
         }
         
@@ -88,10 +91,15 @@ bool ModManager::extractMod(const std::string& zip_path,
         
         // 构建完整的目标文件路径 (Build complete target file path)
         std::string target_file_path = target_directory_zip + file_stat.m_filename;
+        // 记录已提取的文件路径 (Record extracted file path)
+        extracted_files.insert(extracted_files.begin(), target_file_path);
+        
         
         // 再次检查是否需要停止 (Check again if stop is requested)
         if (stop_token.stop_requested()) {
             free(aligned_buffer);
+            // 先清理已安装内容
+            cleanupCopiedFilesAndDirectories(extracted_files,progress_callback,files_total);
             return false;
         }
         
@@ -139,6 +147,8 @@ bool ModManager::extractMod(const std::string& zip_path,
                 mz_zip_reader_extract_iter_free(iter_state);
                 fclose(dest_file);
                 free(aligned_buffer);
+                // 先清理已安装内容
+                cleanupCopiedFilesAndDirectories(extracted_files,progress_callback,files_total);
                 return false;
             }
             
@@ -1171,20 +1181,8 @@ bool ModManager::installModFromZipDirect(const std::string& zip_path,
     all_directories.clear();
     all_directories.shrink_to_fit();
     
-    auto extract_progress = [&](int current, int total, const std::string& filename, bool is_copying_file, float file_progress_percentage,
-                                const std::string& dialog_title, const int* progress_bar_color) {
-        if (progress_callback) {
-            // 使用指针直接访问文件名，避免字符串拷贝 (Use pointer to access filename directly, avoid string copy)
-            const char* filename_ptr = filename.c_str();
-            const char* last_slash = strrchr(filename_ptr, '/');
-            const char* display_name = last_slash ? last_slash + 1 : filename_ptr;
-            // 显示当前个数/总个数格式 (Display current count/total count format)
-            progress_callback(current, total, display_name, is_copying_file, file_progress_percentage, "", COLOR_BLUE);
-        }
-    };
-    
     // 直接解压到atmosphere目录（目录已预创建）
-    bool extract_success = extractMod(zip_path, files_total, extract_progress, error_callback, stop_token, &zip_archive);
+    bool extract_success = extractMod(zip_path, files_total, progress_callback, error_callback, stop_token, &zip_archive);
     //完成解压后关闭ZIP读取器
     mz_zip_reader_end(&zip_archive);
     
