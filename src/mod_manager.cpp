@@ -2,7 +2,7 @@
 #include "lang_manager.hpp"
 #include "json_manager.hpp"  // 添加JSON管理器头文件
 #include "miniz/miniz.h"
-#include "utils/logger.hpp"  // 添加日志头文件
+// #include "utils/logger.hpp"  // 添加日志头文件
 #include <switch.h>
 #include <dirent.h>
 #include <sys/stat.h>
@@ -1245,112 +1245,130 @@ bool ModManager::installModFromFolder(const std::string& folder_path,
     
     // 统计文件数量并缓存路径 (Count files and cache paths)
     std::vector<FileInfo> cached_files; // 存储文件信息 (Store file information)
+    cached_files.reserve(3000); // 预分配3000个FileInfo容量，避免频繁重分配 (Pre-allocate capacity for 3000 FileInfo to avoid frequent reallocation)
+    
     std::vector<std::string> directories_to_create; // 存储需要创建的目录路径 (Store directory paths to be created)
+    directories_to_create.reserve(500); // 预分配500个目录容量，通常足够使用 (Pre-allocate capacity for 500 directories, usually sufficient)
     size_t total_files = 0;
     size_t global_file_count = 0; // 全局累计计数器 (Global cumulative counter)
     bool countFuncErr = false;
-    // 递归统计文件的函数 (Recursive function to count files)
-    std::function<size_t(std::string&, std::string&, std::stop_token stop_token)> count_files = 
-        [&](std::string& source_path, std::string& target_path, std::stop_token stop_token) -> size_t {
-        size_t local_count = 0; // 当前目录的文件数 (File count for current directory)
-        DIR* dir = opendir(source_path.c_str());
-        if (!dir) {
-            // 标记有错误
-            countFuncErr = true;
-            // 无法打开源目录，输出错误信息用于诊断 (Cannot open source directory, output error for diagnosis)
-            if (error_callback) {
-                error_callback(CANT_OPEN_FILE + source_path + ", errno: " + std::to_string(errno));
-            }
-            return 0;
-        }
-        // 检查是否有错误发生，立即跳出递归 (Check if error occurred, immediately exit recursion)
-        if (countFuncErr) {
-            closedir(dir);
-            return 0;
-        }
-        struct dirent* entry;
-        while ((entry = readdir(dir)) != nullptr) {
+    
+    // 内联迭代式统计文件的实现，避免std::function开销 (Inline iterative file counting implementation to avoid std::function overhead)
+    auto count_files_impl = [&](const std::string& initial_source_path, const std::string& initial_target_path, std::stop_token stop_token) -> size_t {
+        
+        // 目录条目结构体，使用移动语义减少拷贝 (Directory entry structure with move semantics to reduce copying)
+        struct DirEntry {
+            std::string source_path;
+            std::string target_path;
+            
+            // 支持移动构造，减少字符串拷贝 (Support move construction to reduce string copying)
+            DirEntry(std::string src, std::string tgt) 
+                : source_path(std::move(src)), target_path(std::move(tgt)) {}
+        };
+        
+        // 使用栈来模拟递归 (Use stack to simulate recursion)
+        std::vector<DirEntry> dir_stack;
+        dir_stack.reserve(128); // 预分配栈空间，避免频繁重分配 (Pre-allocate stack space to avoid frequent reallocation)
+        dir_stack.emplace_back(std::string(initial_source_path), std::string(initial_target_path));
+        
+        size_t total_count = 0; // 总文件数 (Total file count)
+        
+        // 迭代处理栈中的目录 (Iteratively process directories in stack)
+        while (!dir_stack.empty() && !countFuncErr) {
             // 检查是否被请求停止 (Check if stop requested)
             if (stop_token.stop_requested()) {
-                return 0;
+                return total_count;
             }
             
-            // 检查是否有错误发生，立即跳出递归 (Check if error occurred, immediately exit recursion)
-            if (countFuncErr) {
-                closedir(dir);
-                return 0;
-            }
-
-            if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0) {
-                continue;
-            }
+            // 从栈顶取出目录 (Pop directory from stack top)
+            DirEntry current_dir = std::move(dir_stack.back());
+            dir_stack.pop_back();
             
-            // 优化：预分配字符串容量，减少内存重分配
-            std::string source_file;
-            source_file.reserve(source_path.length() + strlen(entry->d_name) + 2);
-            source_file = source_path;
-            source_file += '/';
-            source_file += entry->d_name;
-            
-            std::string target_file;
-            target_file.reserve(target_path.length() + strlen(entry->d_name) + 2);
-            target_file = target_path;
-            target_file += '/';
-            target_file += entry->d_name;
-            
-            
-            // 直接使用d_type判断文件类型，避免stat()系统调用 (Use d_type directly to determine file type, avoiding stat() system call)
-            if (entry->d_type == DT_DIR) {
-                // 收集目录路径，延迟创建 (Collect directory path for delayed creation)
-                directories_to_create.push_back(target_file);
-                // 递归处理子目录 (Recursively process subdirectory)
-                local_count += count_files(source_file, target_file, stop_token);
-                // 检查递归调用后是否有错误，立即跳出 (Check if error occurred after recursive call, immediately exit)
-                if (countFuncErr) {
-                    closedir(dir);
-                    return 0;
+            // 打开当前目录 (Open current directory)
+            DIR* dir = opendir(current_dir.source_path.c_str());
+            if (!dir) {
+                // 标记有错误 (Mark error)
+                countFuncErr = true;
+                // 无法打开源目录，输出错误信息用于诊断 (Cannot open source directory, output error for diagnosis)
+                if (error_callback) {
+                    error_callback(CANT_OPEN_FILE + current_dir.source_path + ", errno: " + std::to_string(errno));
                 }
-            } else if (entry->d_type == DT_REG) {
-                // 使用access()检查文件是否存在（F_OK表示检查文件存在性）
-                if (access(target_file.c_str(), F_OK) == 0) {
-                    // 检查是哪个mod冲突
-                    GetConflictingModNames(folder_path, target_file, progress_callback, error_callback, stop_token);
-                    // 标记有错误
-                    countFuncErr = true;
-                    // 存在冲突，停止循环
+                return total_count;
+            }
+            
+            struct dirent* entry;
+            while ((entry = readdir(dir)) != nullptr && !countFuncErr) {
+                // 检查是否被请求停止 (Check if stop requested)
+                if (stop_token.stop_requested()) {
                     closedir(dir);
-                    return 0;
-                }
-                // 获取文件大小并缓存文件信息 (Get file size and cache file info)
-                struct stat file_stat;
-                if (stat(source_file.c_str(), &file_stat) == 0) {
-                    // 存储文件信息到结构体 (Store file info to structure)
-                    cached_files.push_back({source_file, target_file, static_cast<size_t>(file_stat.st_size)});
-                    local_count++;
-                    global_file_count++; // 增加全局计数器 (Increment global counter)
-                } else {
-                    // 处理获取文件信息失败的情况 (Handle file info retrieval failure)
-                    // 标记有错误
-                    countFuncErr = true;
-                    if (error_callback) {
-                        error_callback("Cannot get file info: " + source_file + ", errno: " + std::to_string(errno));
-                    }
-                    closedir(dir);
-                    return 0;
+                    return total_count;
                 }
                 
-                // 每10个文件更新一次进度，使用全局计数器 (Update progress every 10 files using global counter)
-                if (global_file_count % 10 == 0 && progress_callback) {
-                    progress_callback(0, global_file_count, CALCULATE_FILES, false, 0.0f);
+                if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0) {
+                    continue;
+                }
+                
+                // 直接构造路径字符串，避免clear+append的开销 (Directly construct path strings to avoid clear+append overhead)
+                const std::string source_file_path = current_dir.source_path + "/" + entry->d_name;
+                const std::string target_file_path = current_dir.target_path + "/" + entry->d_name;
+                
+                // 直接使用d_type判断文件类型，避免stat()系统调用 (Use d_type directly to determine file type, avoiding stat() system call)
+                if (entry->d_type == DT_DIR) {
+                    // 检查是否需要扩容：当使用率达到80%时增加500个容量 (Check if expansion needed: add 500 capacity when 80% full)
+                    if (directories_to_create.size() >= directories_to_create.capacity() * 0.8) {
+                        directories_to_create.reserve(directories_to_create.capacity() + 100);
+                    }
+                    
+                    // 收集目录路径，延迟创建 (Collect directory path for delayed creation)
+                    directories_to_create.push_back(target_file_path);
+                    // 将子目录推入栈中处理 (Push subdirectory into stack for processing)
+                    dir_stack.emplace_back(source_file_path, target_file_path);
+                } else if (entry->d_type == DT_REG) {
+                    // 使用access()检查文件是否存在（F_OK表示检查文件存在性）
+                    if (access(target_file_path.c_str(), F_OK) == 0) {
+                        // 检查是哪个mod冲突 (Check which mod conflicts)
+                        GetConflictingModNames(folder_path, target_file_path, progress_callback, error_callback, stop_token);
+                        // 标记有错误 (Mark error)
+                        countFuncErr = true;
+                        // 存在冲突，停止循环 (Conflict exists, stop loop)
+                        closedir(dir);
+                        return total_count;
+                    }
+                    
+                    // 获取文件大小并缓存文件信息 (Get file size and cache file info)
+                    struct stat file_stat;
+                    if (stat(source_file_path.c_str(), &file_stat) == 0) {
+                        // 检查是否需要扩容：当使用率达到80%时增加3000个容量 (Check if expansion needed: add 3000 capacity when 80% full)
+                        if (cached_files.size() >= cached_files.capacity() * 0.8) {
+                            cached_files.reserve(cached_files.capacity() + 3000);
+                        }
+                        
+                        // 存储文件信息到结构体，直接在容器内构造避免临时对象 (Store file info to structure, construct in-place to avoid temporary objects)
+                        cached_files.emplace_back(source_file_path, target_file_path, static_cast<size_t>(file_stat.st_size));
+                        total_count++;
+                        global_file_count++; // 增加全局计数器 (Increment global counter)
+                    } else {
+                        // 处理获取文件信息失败的情况 (Handle file info retrieval failure)
+                        // 标记有错误 (Mark error)
+                        countFuncErr = true;
+                        if (error_callback) {
+                            error_callback("Cannot get file info: " + source_file_path + ", errno: " + std::to_string(errno));
+                        }
+                        closedir(dir);
+                        return total_count;
+                    }
+                    
+                    // 每10个文件更新一次进度，使用全局计数器 (Update progress every 10 files using global counter)
+                    if (global_file_count % 10 == 0 && progress_callback) {
+                        progress_callback(0, global_file_count, CALCULATE_FILES, false, 0.0f);
+                    }
                 }
             }
+            
+            closedir(dir);
         }
-        closedir(dir);
         
-        // 不再显示当前目录的文件数，避免进度跳跃 (No longer show current directory file count to avoid progress jumping)
-        // 进度更新已在文件处理时通过全局计数器完成 (Progress updates are handled via global counter during file processing)
-        
-        return local_count;
+        return total_count;
     };
 
     
@@ -1366,7 +1384,7 @@ bool ModManager::installModFromFolder(const std::string& folder_path,
         target_contents = target_directory_zip;
         target_contents += "contents";
         
-        total_files += count_files(contents_path, target_contents, stop_token);
+        total_files += count_files_impl(contents_path, target_contents, stop_token);
     }
 
     if (countFuncErr) {
@@ -1386,7 +1404,7 @@ bool ModManager::installModFromFolder(const std::string& folder_path,
         target_exefs = target_directory_zip;
         target_exefs += "exefs_patches";
         
-        total_files += count_files(exefs_path, target_exefs, stop_token);
+        total_files += count_files_impl(exefs_path, target_exefs, stop_token);
     }
     
     if (countFuncErr) {
