@@ -1615,6 +1615,8 @@ bool ModManager::copyFilesBatch(const std::vector<FileInfo>& file_info_list,
                      error_callback(CANT_OPEN_FILE + file_info.source_path);
                  }
                  free(aligned_buffer);
+                 // 安装发生错误，调用清理函数
+                 cleanupCopiedFilesAndDirectories_forError(copied_files_list, progress_callback, total_files);
                  return false;
              }
             
@@ -1642,6 +1644,8 @@ bool ModManager::copyFilesBatch(const std::vector<FileInfo>& file_info_list,
                      error_callback(CANT_READ_ERROR + file_info.source_path);
                  }
                  free(aligned_buffer);
+                 // 安装发生错误，调用清理函数
+                 cleanupCopiedFilesAndDirectories_forError(copied_files_list, progress_callback, total_files);
                  return false;
              }
          } else {
@@ -1649,6 +1653,8 @@ bool ModManager::copyFilesBatch(const std::vector<FileInfo>& file_info_list,
              if (!cached_files.empty()) {
                  if (!flush_cached_files()) {
                      free(aligned_buffer);
+                     // 安装发生错误，调用清理函数
+                     cleanupCopiedFilesAndDirectories_forError(copied_files_list, progress_callback, total_files);
                      return false;
                  }
              }
@@ -1660,6 +1666,8 @@ bool ModManager::copyFilesBatch(const std::vector<FileInfo>& file_info_list,
                      error_callback(CANT_OPEN_FILE + file_info.source_path);
                  }
                  free(aligned_buffer);
+                 // 安装发生错误，调用清理函数
+                 cleanupCopiedFilesAndDirectories_forError(copied_files_list, progress_callback, total_files);
                  return false;
              }
              
@@ -1676,6 +1684,8 @@ bool ModManager::copyFilesBatch(const std::vector<FileInfo>& file_info_list,
                      error_callback(CANT_CREATE_DIR + file_info.target_path + ", errno: " + std::to_string(errno));
                  }
                  free(aligned_buffer);
+                 // 安装发生错误，调用清理函数
+                 cleanupCopiedFilesAndDirectories_forError(copied_files_list, progress_callback, total_files);
                  return false;
              }
              
@@ -1736,37 +1746,41 @@ bool ModManager::copyFilesBatch(const std::vector<FileInfo>& file_info_list,
                  if (bytes_read < to_read) break;
              }
               
-              // 统一的错误处理 (Unified error handling)
-              if (!file_success && error_callback) {
-                  if (ferror(source_file)) {
-                      error_callback(CANT_READ_ERROR + file_info.source_path);
-                  } else if (ferror(dest_file)) {
-                      error_callback(CANT_WRITE_ERROR + file_info.target_path);
-                  } else {
-                      error_callback(CANT_WRITE_ERROR + file_info.target_path);
-                  }
-              }
-              
-              
               // 关闭文件句柄 (Close file handles)
               fclose(source_file);
               fclose(dest_file);
               
+              // 统一的错误处理 - 发生错误立即停止安装 (Unified error handling - stop installation immediately on error)
               if (!file_success) {
-                  overall_success = false;
-              } else {
-                  copied_files++;
-                  
-                  // 更新总体进度 (Update overall progress)
-                  if (progress_callback) {
-                      progress_callback(copied_files, total_files, filename_ptr, false, 0.0f, "", COLOR_BLUE);
+                  if (error_callback) {
+                      if (ferror(source_file)) {
+                          error_callback(CANT_READ_ERROR + file_info.source_path);
+                      } else {
+                          error_callback(CANT_WRITE_ERROR + file_info.target_path);
+                      }
                   }
+                  // 清理块对齐缓冲区 (Clean up block-aligned buffers)
+                  free(aligned_buffer);
+                  // 安装发生错误，调用清理函数并立即停止 (Installation error occurred, cleanup and stop immediately)
+                  cleanupCopiedFilesAndDirectories_forError(copied_files_list, progress_callback, total_files);
+                  
+                  return false; // 立即停止安装 (Stop installation immediately)
+              }
+              
+              // 文件复制成功，更新计数和进度 (File copy successful, update count and progress)
+              copied_files++;
+              
+              // 更新总体进度 (Update overall progress)
+              if (progress_callback) {
+                  progress_callback(copied_files, total_files, filename_ptr, false, 0.0f, "", COLOR_BLUE);
               }
           }
      }
      
      // 处理剩余的小文件缓存 (Process remaining cached small files)
      if (!flush_cached_files()) {
+         // 安装发生错误，调用清理函数
+         cleanupCopiedFilesAndDirectories_forError(copied_files_list, progress_callback, total_files);
          overall_success = false;
      }
      
@@ -2502,6 +2516,9 @@ void ModManager::cleanupCopiedFilesAndDirectories(std::vector<std::string>& copi
 void ModManager::cleanupCopiedFilesAndDirectories_forError(std::vector<std::string>& copied_files,
                                                  ProgressCallback progress_callback,
                                                  int total_items) {       
+    
+
+
     
     // 立即播放错误音效 (Play error sound immediately)
     if (g_audio_manager) {
