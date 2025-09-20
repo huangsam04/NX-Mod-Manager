@@ -218,6 +218,16 @@ public:
                                std::stop_token stop_token);
     
     /**
+     * 清理已创建的目录
+     * @param directories 目录列表
+     * @param created_count 已创建的目录数量
+     * @param error_callback 错误回调函数
+     */
+    void cleanupCreatedDirectories(const std::vector<std::string>& directories, 
+                                  size_t created_count,
+                                  ErrorCallback error_callback);
+    
+    /**
      * 规范化路径（统一路径分隔符）
      * @param path 原始路径
      * @return 规范化后的路径

@@ -1920,6 +1920,19 @@ bool ModManager::copyFilesBatch2(const std::vector<FileInfo>& file_info_list,
     return overall_success;
 }
 
+// 清理已创建的目录函数 (Clean up created directories function)
+void ModManager::cleanupCreatedDirectories(const std::vector<std::string>& directories, 
+                                          size_t created_count,
+                                          ErrorCallback error_callback) {
+    // 逆序删除已创建的目录，确保子目录先于父目录被删除 (Delete in reverse order to ensure child directories are deleted before parent directories)
+    for (size_t i = created_count; i > 0; --i) {
+        const std::string& dir_path = directories[i - 1];
+        
+        // 直接删除已创建的目录，不管删除结果 (Directly delete created directories, ignore deletion result)
+        rmdir(dir_path.c_str());
+    }
+}
+
 // 批量创建目录函数
 bool ModManager::createDirectoriesBatch(std::vector<std::string>& directories, 
                                        ProgressCallback progress_callback, 
@@ -1937,20 +1950,26 @@ bool ModManager::createDirectoriesBatch(std::vector<std::string>& directories,
     directories.erase(std::unique(directories.begin(), directories.end()), directories.end());
     
     // 批量创建目录 (Batch create directories)
+    size_t created_count = 0; // 记录已创建的目录数量 (Track number of created directories)
+    
     for (const std::string& dir_path : directories) {
         // 检查是否需要停止 (Check if stop is requested)
         if (stop_token.stop_requested()) {
-            
+            // 清理已创建的目录 (Clean up created directories)
+            cleanupCreatedDirectories(directories, created_count, error_callback);
             return false;
         }
         
         if (mkdir(dir_path.c_str(), 0755) != 0 && errno != EEXIST) {
-
             if (error_callback) {
                 error_callback(CANT_CREATE_DIR + dir_path + ", errno: " + std::to_string(errno));
             }
+            cleanupCreatedDirectories(directories, created_count, error_callback);
             return false;
         }
+        
+        // 无论成功还是失败都计数，否则到时定位的不准
+        created_count++;
     }
     
     return true;
