@@ -3837,6 +3837,9 @@ App::App() {
     // 异步初始化音效管理器，避免阻塞启动流程 (Initialize audio manager asynchronously to avoid blocking startup)
     this->audio_manager.InitializeAsync();
     
+    // 设置全局音效管理器指针 (Set global audio manager pointer)
+    g_audio_manager = &this->audio_manager;
+    
 }
 
 // 加载模组名称映射文件 (Load mod name mapping file)

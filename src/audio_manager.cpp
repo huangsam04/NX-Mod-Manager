@@ -5,6 +5,9 @@
 #include "audio_manager.hpp"
 #include <cstring>
 
+// 全局 AudioManager 指针定义 (Global AudioManager pointer definition)
+AudioManager* g_audio_manager = nullptr;
+
 // AudioManager::AudioManager() 
 //     : m_initialized(false)
 //     , m_keySoundId(PLSR_PLAYER_INVALID_SOUND)

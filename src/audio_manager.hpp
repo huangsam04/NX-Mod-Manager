@@ -122,3 +122,6 @@ private:
      */
     bool LoadSystemSounds();
 };
+
+// 全局 AudioManager 指针，用于在其他模块中播放音效 (Global AudioManager pointer for playing audio in other modules)
+extern AudioManager* g_audio_manager;

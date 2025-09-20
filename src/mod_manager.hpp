@@ -238,6 +238,18 @@ public:
     void cleanupCopiedFilesAndDirectories(std::vector<std::string>& copied_files,
                                          ProgressCallback progress_callback,
                                          int total_items);
+
+
+    /**
+     * 清理已复制的文件和已创建的目录（用于安装出错时的清理）
+     * @param copied_files 已复制的文件路径列表
+     * @param progress_callback 进度回调函数
+     * @param total_items 总项目数（文件数+目录数）
+     */
+    void cleanupCopiedFilesAndDirectories_forError(std::vector<std::string>& copied_files,
+                                         ProgressCallback progress_callback,
+                                         int total_items);
+
     
     /**
      * 规范化路径（统一路径分隔符）

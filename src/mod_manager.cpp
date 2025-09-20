@@ -1,6 +1,7 @@
 #include "mod_manager.hpp"
 #include "lang_manager.hpp"
 #include "json_manager.hpp"  // 添加JSON管理器头文件
+#include "audio_manager.hpp"  // 添加音效管理器头文件
 #include "miniz/miniz.h"
 // #include "utils/logger.hpp"  // 添加日志头文件
 #include <switch.h>
@@ -62,7 +63,6 @@ bool ModManager::extractMod(const std::string& zip_path,
         return false;
     }
     
-    bool overall_success = true;
     // 用于存储已复制的文件路径，即使这个文件没有真的被复制。
     std::vector<std::string> extracted_files;
     // 提取每个文件，直接按顺序写入 (Extract each file, write directly in sequence)
@@ -78,6 +78,8 @@ bool ModManager::extractMod(const std::string& zip_path,
         mz_zip_archive_file_stat file_stat;
         if (!mz_zip_reader_file_stat(zip_archive, i, &file_stat)) {
             free(aligned_buffer);
+            // 安装发生错误，调用清理函数
+            cleanupCopiedFilesAndDirectories_forError(extracted_files,progress_callback,files_total);
             if (error_callback) {
                 error_callback(ZIP_READ_ERROR + zip_path);
             }
@@ -107,6 +109,8 @@ bool ModManager::extractMod(const std::string& zip_path,
         mz_zip_reader_extract_iter_state* iter_state = mz_zip_reader_extract_iter_new(zip_archive, i, 0);
         if (!iter_state) {
             free(aligned_buffer);
+            // 安装发生错误，调用清理函数
+            cleanupCopiedFilesAndDirectories_forError(extracted_files,progress_callback,files_total);
             if (error_callback) {
                 error_callback(CANT_READ_ERROR + std::string(file_stat.m_filename));
             }
@@ -121,6 +125,8 @@ bool ModManager::extractMod(const std::string& zip_path,
         if (!dest_file) {
             mz_zip_reader_extract_iter_free(iter_state);
             free(aligned_buffer);
+            // 安装发生错误，调用清理函数
+            cleanupCopiedFilesAndDirectories_forError(extracted_files,progress_callback,files_total);
             if (error_callback) {
                 error_callback(CANT_CREATE_ERROR + target_file_path + ", errno: " + std::to_string(errno));
             }
@@ -160,8 +166,16 @@ bool ModManager::extractMod(const std::string& zip_path,
             if (bytes_read > 0) {
                 // 写入实际读取的字节数，保持文件原始大小 (Write actual bytes read, maintain original file size)
                 if (fwrite(aligned_buffer, 1, bytes_read, dest_file) != bytes_read) {
-                    file_success = false;
-                    break;
+                    // 写入失败，立即清理资源并停止安装 (Write failed, immediately cleanup and stop installation)
+                    mz_zip_reader_extract_iter_free(iter_state);
+                    fclose(dest_file);
+                    free(aligned_buffer);
+                    // 安装发生错误，调用清理函数
+                    cleanupCopiedFilesAndDirectories_forError(extracted_files,progress_callback,files_total);
+                    if (error_callback) {
+                        error_callback(CANT_WRITE_ERROR + target_file_path);
+                    }
+                    return false;
                 }
                 total_written += bytes_read;
                 
@@ -176,37 +190,24 @@ bool ModManager::extractMod(const std::string& zip_path,
             if (bytes_read < to_read) break;
         }
         
-        // 统一的错误处理 (Unified error handling)
-        if (!file_success && error_callback) {
-            if (ferror(dest_file)) {
-                error_callback(CANT_WRITE_ERROR + target_file_path);
-            } else {
-                error_callback(CANT_WRITE_ERROR + target_file_path);
-            }
-        }
-        
-
-        
         // 关闭文件句柄和清理资源 (Close file handles and cleanup resources)
         mz_zip_reader_extract_iter_free(iter_state);
         fclose(dest_file);
         
-        if (!file_success) {
-            overall_success = false;
-        } else {
-            processed_files++;
-            
-            // 更新总体进度 (Update overall progress)
-            if (progress_callback) {
-                progress_callback(processed_files, files_total, filename_ptr, false, 0.0f, "", COLOR_BLUE);
-            }
+        // 文件处理成功，更新计数器 (File processed successfully, update counter)
+        processed_files++;
+        
+        // 更新总体进度 (Update overall progress)
+        if (progress_callback) {
+            progress_callback(processed_files, files_total, filename_ptr, false, 0.0f, "", COLOR_BLUE);
         }
     }
     
     // 清理块对齐缓冲区 (Clean up block-aligned buffers)
     free(aligned_buffer);
     
-    return overall_success;
+    // 如果执行到这里，说明所有文件都成功处理 (If we reach here, all files were processed successfully)
+    return true;
 }
 
 // // 带聚合的速度不如顺序的，备用不删了
@@ -2462,6 +2463,61 @@ void ModManager::cleanupCopiedFilesAndDirectories(std::vector<std::string>& copi
         // 更新进度 (Update progress)
         if (progress_callback) {
             progress_callback(delete_items, total_items, "正在清理文件...", false, 0.0f, "正在撤销安装", COLOR_RED);
+        }
+    }
+    
+    // 再删除所有缓存的已创建目录，按深度从深到浅排序后删除 (Then delete all cached created directories, sort by depth from deep to shallow)
+    if (!cached_created_directories.empty()) {
+        // 按路径深度从深到浅排序，确保先删除子目录再删除父目录 (Sort by path depth from deep to shallow to ensure child directories are deleted before parent directories)
+        std::sort(cached_created_directories.begin(), cached_created_directories.end(), [](const std::string& a, const std::string& b) {
+            // 计算路径深度（斜杠数量） (Calculate path depth by counting slashes)
+            int depth_a = std::count(a.begin(), a.end(), '/');
+            int depth_b = std::count(b.begin(), b.end(), '/');
+            
+            // 深度大的排在前面（先删除深层目录） (Deeper paths come first - delete deeper directories first)
+            if (depth_a != depth_b) {
+                return depth_a > depth_b;
+            }
+            
+            // 深度相同时按字典序排序 (Same depth, sort lexicographically)
+            return a > b;
+        });
+        
+        // 删除目录，失败也不管 (Delete directories, ignore failures)
+        for (const std::string& dir_path : cached_created_directories) {
+            // 跳过重要的系统目录，不能删除 (Skip important system directories, cannot delete)
+            if (dir_path == "/atmosphere/contents" || dir_path == "/atmosphere/exefs_patches") {
+                continue;
+            }
+            
+            remove(dir_path.c_str()); // 删除目录，忽略错误 (Delete directory, ignore errors)
+        }
+    }
+    
+    // 清空缓存的目录列表 (Clear cached directory list)
+    cached_created_directories.clear();
+}
+
+// 当安装出错的时候调用这个函数，基本和cleanupCopiedFilesAndDirectories一致
+void ModManager::cleanupCopiedFilesAndDirectories_forError(std::vector<std::string>& copied_files,
+                                                 ProgressCallback progress_callback,
+                                                 int total_items) {       
+    
+    // 立即播放错误音效 (Play error sound immediately)
+    if (g_audio_manager) {
+        g_audio_manager->PlayCancelSound(1.0f);
+    }
+                                                    
+    size_t delete_items = copied_files.size();
+    
+    // 先删除所有复制的文件，失败也不管 (Delete all copied files first, ignore failures)
+    for (const std::string& file_path : copied_files) {
+        remove(file_path.c_str()); // 删除文件，忽略错误 (Delete file, ignore errors)
+        delete_items--;
+        
+        // 更新进度 (Update progress)
+        if (progress_callback) {
+            progress_callback(delete_items, total_items, "正在清理文件...", false, 0.0f, "安装错误", COLOR_RED);
         }
     }
     
