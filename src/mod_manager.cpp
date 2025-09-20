@@ -2400,6 +2400,7 @@ void ModManager::GetConflictingModNames(const std::string& mod_dir_path,const st
     int processed_mod_count = 0;
     // 当前检查的mod的映射名
     std::string current_mod_name;
+    std::string mod_conflicting_name;
     for (const auto& mod_path : installed_mod_paths) {
 
         if (stop_token.stop_requested()) {
@@ -2421,10 +2422,11 @@ void ModManager::GetConflictingModNames(const std::string& mod_dir_path,const st
         if (zip_mod_path.empty()) {
             std::string installed_mod_conflicting_file_Path = mod_path + "/" + contents_path;
             if (access(installed_mod_conflicting_file_Path.c_str(), F_OK) == 0) {
-                if (error_callback) {
-                    error_callback("冲突MOD：" + current_mod_name + "\n冲突文件：" + contents_path);
-                }
-                return;
+                mod_conflicting_name = mod_conflicting_name + "[" current_mod_name + "] ";
+                // if (error_callback) {
+                //     error_callback("冲突MOD：" + current_mod_name + "\n冲突文件：" + contents_path);
+                // }
+                // return;
             }
             processed_mod_count++;
             continue;
@@ -2447,13 +2449,17 @@ void ModManager::GetConflictingModNames(const std::string& mod_dir_path,const st
 
         // 如果找到了文件（file_index >= 0），说明存在冲突
         if (file_index >= 0) {
-            if (error_callback) {
-                error_callback("冲突MOD：" + current_mod_name + "\n冲突文件：" + contents_path);
-            }
-            return;
+            mod_conflicting_name = mod_conflicting_name + "[" + current_mod_name + "] ";
         }
         processed_mod_count++;
 
+    }
+
+    if (!mod_conflicting_name.empty()) {
+        if (error_callback) {
+            error_callback("发现冲突的MOD：" + mod_conflicting_name + "\n冲突文件：" + contents_path);
+        }
+        return;
     }
 
     // 所有已安装mod中未找到冲突文件
