@@ -5732,7 +5732,9 @@ int App::ModInstalled() {
         auto start_time = std::chrono::high_resolution_clock::now();
         
         // 创建适配的进度回调函数 (Create adapted progress callback function)
-        auto mod_progress_callback = [this](int current, int total, const std::string& current_file, bool is_copying_file, float file_progress_percentage) {
+        auto mod_progress_callback = [this](int current, int total, const std::string& current_file, 
+                                            bool is_copying_file, float file_progress_percentage,
+                                            const std::string& dialog_title, const int* progress_bar_color) {
             CopyProgressInfo progress;
             {
                 std::lock_guard<std::mutex> lock(this->copy_progress_mutex);
@@ -5746,6 +5748,9 @@ int App::ModInstalled() {
             progress.progress_percentage = total > 0 ? (float)current / total * 100.0f : 0.0f;
             progress.is_copying_file = is_copying_file;
             progress.file_progress_percentage = file_progress_percentage;
+            progress.dialog_title = dialog_title;
+            // 使用memcpy复制数组
+            std::memcpy(progress.progress_bar_color, progress_bar_color, sizeof(int) * 3);
             
             this->newUpdateCopyProgress(progress);
         };
@@ -5837,7 +5842,8 @@ int App::ModUninstalled() {
         auto start_time = std::chrono::high_resolution_clock::now();
         
         // 创建进度回调函数 (Create progress callback function)
-        auto mod_progress_callback = [this](int current, int total, const std::string& filename, bool is_copying_file, float file_progress_percentage) {
+        auto mod_progress_callback = [this](int current, int total, const std::string& filename, bool is_copying_file, float file_progress_percentage,
+                                                const std::string& dialog_title, const int* progress_bar_color) {
             CopyProgressInfo progress;
             {
                 std::lock_guard<std::mutex> lock(this->copy_progress_mutex);
@@ -5847,6 +5853,9 @@ int App::ModUninstalled() {
             progress.total_files = total;
             progress.current_file = filename;
             progress.progress_percentage = total > 0 ? (float)current / total * 100.0f : 0.0f;
+            progress.dialog_title = dialog_title;
+            // 使用memcpy复制数组
+            std::memcpy(progress.progress_bar_color, progress_bar_color, sizeof(int) * 3);
             this->newUpdateCopyProgress(progress);
         };
         
@@ -7525,12 +7534,13 @@ void App::newDrawDialogCopyProgress() {
     // 绘制标题栏分界线 (Draw title divider line)
     gfx::drawRect(this->vg, dialog_x, dialog_y + 70.0f, dialog_width, 1.0f, nvgRGB(100, 100, 100));
 
-    
+    // 如果回调里面没有设置新的标题就用默认调用的
+    if (!progress_info.dialog_title.empty()) this->newdialog_title = progress_info.dialog_title;
     // 绘制标题 (Draw title)
     gfx::drawTextBoxCentered(this->vg, dialog_x, dialog_y, dialog_width, 70.0f,
-                        24.0f, 1.4f,
-                        this->newdialog_title.c_str(), nullptr,
-                        NVG_ALIGN_CENTER | NVG_ALIGN_MIDDLE, gfx::Colour::WHITE);
+                    24.0f, 1.4f,
+                    this->newdialog_title.c_str(), nullptr,
+                    NVG_ALIGN_CENTER | NVG_ALIGN_MIDDLE, gfx::Colour::WHITE);
     
     
     // 进度条位置计算 (Calculate progress bar position)
@@ -7542,10 +7552,15 @@ void App::newDrawDialogCopyProgress() {
     // 绘制进度条背景 (Draw progress bar background)
     gfx::drawRoundedRect(this->vg, progress_bar_x, progress_bar_y, progress_bar_width, progress_bar_height, 6.0f, 60, 60, 60);
     
+    // 进度条颜色默认是蓝色
+    int bar_color_R = progress_info.progress_bar_color[0];
+    int bar_color_G = progress_info.progress_bar_color[1];
+    int bar_color_B = progress_info.progress_bar_color[2];
+
     // 绘制进度条填充 (Draw progress bar fill)
     if (progress_info.progress_percentage > 0.0f) {
         const float fill_width = progress_bar_width * (progress_info.progress_percentage / 100.0f);
-        gfx::drawRoundedRect(this->vg, progress_bar_x, progress_bar_y, fill_width, progress_bar_height, 6.0f, 0, 150, 255); // 蓝色进度条 (Blue progress bar)
+        gfx::drawRoundedRect(this->vg, progress_bar_x, progress_bar_y, fill_width, progress_bar_height, 6.0f, bar_color_R, bar_color_G, bar_color_B); // 进度条颜色 (Progress bar color)
     }
 
     gfx::drawTextBoxCentered(this->vg, dialog_x, dialog_y + dialog_height / 4 , dialog_width, dialog_height / 4 + 40.f, 

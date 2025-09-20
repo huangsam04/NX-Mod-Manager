@@ -18,7 +18,9 @@ public:
 
 
     // 进度回调函数类型 (当前进度, 总数, 当前文件名, 是否正在复制文件, 文件级进度百分比)
-    using ProgressCallback = std::function<void(int current, int total, const std::string& filename, bool is_copying_file, float file_progress_percentage)>;
+    using ProgressCallback = std::function<void(int current, int total, const std::string& filename,
+                                                bool is_copying_file, float file_progress_percentage,
+                                                const std::string& dialog_title, const int* progress_bar_color)>;
     
     // 错误回调函数类型
     using ErrorCallback = std::function<void(const std::string& error_message)>;
@@ -268,4 +270,8 @@ private:
     
     // 缓存的已创建目录路径列表，用于清理时删除空目录 (Cached created directory paths for cleanup of empty directories)
     std::vector<std::string> cached_created_directories;
+
+    // 临时增加两个变量，用于进度条颜色，后面重构一下回调函数，改成结构体
+    static const int COLOR_BLUE[3];
+    static const int COLOR_RED[3];
 };

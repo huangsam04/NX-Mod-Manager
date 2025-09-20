@@ -19,6 +19,10 @@
 // 定义静态成员变量 (Define static member variable)
 const std::string ModManager::target_directory_zip = "/atmosphere/";
 
+// 定义静态颜色常量 (Define static color constants)
+const int ModManager::COLOR_BLUE[3] = {0, 150, 255};
+const int ModManager::COLOR_RED[3] = {255, 0, 0};
+
 
 ModManager::ModManager() {
     // 构造函数
@@ -155,7 +159,7 @@ bool ModManager::extractMod(const std::string& zip_path,
                 if (progress_callback && file_size > 8 * 1024 * 1024) {
                     int progress_percent = (int)((total_written * 100) / file_size);
                     // 实时更新进度 (Real-time progress update)
-                    progress_callback(processed_files, files_total, filename_ptr, true, (float)progress_percent);
+                    progress_callback(processed_files, files_total, filename_ptr, true, (float)progress_percent, "", COLOR_BLUE);
                     last_progress = progress_percent;
                 }
             }
@@ -184,7 +188,7 @@ bool ModManager::extractMod(const std::string& zip_path,
             
             // 更新总体进度 (Update overall progress)
             if (progress_callback) {
-                progress_callback(processed_files, files_total, filename_ptr, false, 0.0f);
+                progress_callback(processed_files, files_total, filename_ptr, false, 0.0f, "", COLOR_BLUE);
             }
         }
     }
@@ -597,7 +601,7 @@ size_t ModManager::CountModFilesToRemoveWithProgress(const std::string& mod_sour
             
             // 每10个文件更新一次进度 (Update progress every 500 files)
             if ((*current_counted) % 10 == 0 && progress_callback) {
-                progress_callback(0, *current_counted, CALCULATE_FILES, false, 0.0f);
+                progress_callback(0, *current_counted, CALCULATE_FILES, false, 0.0f, "", COLOR_BLUE);
             }
         }
     }
@@ -606,7 +610,7 @@ size_t ModManager::CountModFilesToRemoveWithProgress(const std::string& mod_sour
     
     // 统计完成时更新最终进度 (Update final progress when counting is complete)
     if (progress_callback && count > 0) {
-        progress_callback(0, *current_counted, CALCULATE_FILES, false, 0.0f);
+        progress_callback(0, *current_counted, CALCULATE_FILES, false, 0.0f, "", COLOR_BLUE);
     }
     
     return count;
@@ -689,7 +693,7 @@ bool ModManager::RemoveModFilesFromCache(ProgressCallback progress_callback,
             const char* filename_ptr = target_file_path.c_str();
             const char* last_slash = strrchr(filename_ptr, '/');
             const char* display_name = last_slash ? last_slash + 1 : filename_ptr;
-            progress_callback(processed_files, total_files, display_name, false, progress_percentage);
+            progress_callback(processed_files, total_files, display_name, false, progress_percentage, "", COLOR_BLUE);
         }
     }
     
@@ -926,7 +930,7 @@ bool ModManager::uninstallModFromZipDirect(const std::string& zip_path,
     // return true;
 
     if (progress_callback) {
-        progress_callback(0, valid_file_count, CALCULATE_FILES, false, 0.0f);
+        progress_callback(0, valid_file_count, CALCULATE_FILES, false, 0.0f, "", COLOR_BLUE);
     }
     
     // 调用RemoveModFilesFromCache函数完成实际的文件删除 (Call RemoveModFilesFromCache to perform actual file deletion)
@@ -1032,7 +1036,7 @@ bool ModManager::installModFromZipDirect(const std::string& zip_path,
     
     
     if (progress_callback) {
-        progress_callback(0, 0, CALCULATE_FILES, false, 0.0f);
+        progress_callback(0, 0, CALCULATE_FILES, false, 0.0f, "", COLOR_BLUE);
     }
 
     // 初始化ZIP读取器检查内部结构
@@ -1128,7 +1132,7 @@ bool ModManager::installModFromZipDirect(const std::string& zip_path,
 
             // 每500个文件更新一次进度
             if (progress_callback && files_total % 500 == 0 ) {
-                progress_callback(0, files_total, CALCULATE_FILES, false, 0.0f);
+                progress_callback(0, files_total, CALCULATE_FILES, false, 0.0f, "", COLOR_BLUE);
             }
 
         }
@@ -1167,14 +1171,15 @@ bool ModManager::installModFromZipDirect(const std::string& zip_path,
     all_directories.clear();
     all_directories.shrink_to_fit();
     
-    auto extract_progress = [&](int current, int total, const std::string& filename, bool is_copying_file, float file_progress_percentage) {
+    auto extract_progress = [&](int current, int total, const std::string& filename, bool is_copying_file, float file_progress_percentage,
+                                const std::string& dialog_title, const int* progress_bar_color) {
         if (progress_callback) {
             // 使用指针直接访问文件名，避免字符串拷贝 (Use pointer to access filename directly, avoid string copy)
             const char* filename_ptr = filename.c_str();
             const char* last_slash = strrchr(filename_ptr, '/');
             const char* display_name = last_slash ? last_slash + 1 : filename_ptr;
             // 显示当前个数/总个数格式 (Display current count/total count format)
-            progress_callback(current, total, display_name, is_copying_file, file_progress_percentage);
+            progress_callback(current, total, display_name, is_copying_file, file_progress_percentage, "", COLOR_BLUE);
         }
     };
     
@@ -1194,7 +1199,7 @@ bool ModManager::installModFromFolder(const std::string& folder_path,
     
 
     if (progress_callback) {
-        progress_callback(0, 0, CALCULATE_FILES, false, 0.0f);
+        progress_callback(0, 0, CALCULATE_FILES, false, 0.0f, "", COLOR_BLUE);
     }
 
     // 检查MOD结构是否有效 (Check if MOD structure is valid)
@@ -1360,7 +1365,7 @@ bool ModManager::installModFromFolder(const std::string& folder_path,
                     
                     // 每10个文件更新一次进度，使用全局计数器 (Update progress every 10 files using global counter)
                     if (global_file_count % 10 == 0 && progress_callback) {
-                        progress_callback(0, global_file_count, CALCULATE_FILES, false, 0.0f);
+                        progress_callback(0, global_file_count, CALCULATE_FILES, false, 0.0f, "", COLOR_BLUE);
                     }
                 }
             }
@@ -1415,7 +1420,7 @@ bool ModManager::installModFromFolder(const std::string& folder_path,
 
     // 统计完成后显示最终的文件总数 (Show final total file count after counting)
     if (progress_callback && global_file_count > 0) {
-        progress_callback(0, global_file_count, CALCULATE_FILES, false, 0.0f);
+        progress_callback(0, global_file_count, CALCULATE_FILES, false, 0.0f, "", COLOR_BLUE);
     }
     
     
@@ -1562,7 +1567,7 @@ bool ModManager::copyFilesBatch(const std::vector<FileInfo>& file_info_list,
                         size_t last_slash = cached.first.find_last_of('/');
                         const char* filename_ptr = (last_slash != std::string::npos) ? 
                             cached.first.c_str() + last_slash + 1 : cached.first.c_str();
-                        progress_callback(copied_files, total_files, filename_ptr, false, 0.0f);
+                        progress_callback(copied_files, total_files, filename_ptr, false, 0.0f, "", COLOR_BLUE);
                     }
                 } else {
                     if (error_callback) {
@@ -1631,7 +1636,7 @@ bool ModManager::copyFilesBatch(const std::vector<FileInfo>& file_info_list,
                  total_cached_size += aligned_size;
                  
                  if (progress_callback) {
-                     progress_callback(copied_files, total_files, Aggregating_Files, false, 0.0f);
+                     progress_callback(copied_files, total_files, Aggregating_Files, false, 0.0f, "", COLOR_BLUE);
                  }
              } else {
                  if (error_callback) {
@@ -1725,7 +1730,7 @@ bool ModManager::copyFilesBatch(const std::vector<FileInfo>& file_info_list,
                      if (progress_callback && file_size > 8 * 1024 * 1024) {
                          int progress_percent = (int)((total_read * 100) / file_size);
                          // 实时更新进度，不限制更新频率 (Real-time progress update without frequency limitation)
-                         progress_callback(copied_files, total_files, filename_ptr, true, (float)progress_percent);
+                         progress_callback(copied_files, total_files, filename_ptr, true, (float)progress_percent, "", COLOR_BLUE);
                          last_progress = progress_percent;
                      }
                  }
@@ -1755,7 +1760,7 @@ bool ModManager::copyFilesBatch(const std::vector<FileInfo>& file_info_list,
                   
                   // 更新总体进度 (Update overall progress)
                   if (progress_callback) {
-                      progress_callback(copied_files, total_files, filename_ptr, false, 0.0f);
+                      progress_callback(copied_files, total_files, filename_ptr, false, 0.0f, "", COLOR_BLUE);
                   }
               }
           }
@@ -2335,7 +2340,7 @@ void ModManager::GetConflictingModNames(const std::string& mod_dir_path,const st
     }
     
     if (progress_callback) {
-        progress_callback(0, 0, "正在检查冲突的MOD...", false, 0.0f);
+        progress_callback(0, 0, "正在检查冲突的MOD...", false, 0.0f, "", COLOR_BLUE);
     }
 
     // 从/mods2/游戏名/ID/模组名固定格式提取/mods2/游戏名/ID
@@ -2361,7 +2366,7 @@ void ModManager::GetConflictingModNames(const std::string& mod_dir_path,const st
     int installed_mod_count = static_cast<int>(installed_mod_paths.size());
 
     if (progress_callback) {
-        progress_callback(0, installed_mod_count, "正在检查冲突的MOD...", false, 0.0f);
+        progress_callback(0, installed_mod_count, "正在检查冲突的MOD...", false, 0.0f, "", COLOR_BLUE);
     }
     
 
@@ -2393,7 +2398,7 @@ void ModManager::GetConflictingModNames(const std::string& mod_dir_path,const st
         current_mod_name = GetModJsonName(mod_path);
         // 更新进度条 - 在循环开始时更新    
         if (progress_callback) {
-            progress_callback(processed_mod_count, installed_mod_count, current_mod_name, false, 0.0f);
+            progress_callback(processed_mod_count, installed_mod_count, current_mod_name, false, 0.0f, "", COLOR_BLUE);
         }
         
         //  会检测是否为ZIPMOD，是的话返回ZIPMOD的路径，否则返回空字符串
@@ -2458,7 +2463,7 @@ void ModManager::cleanupCopiedFilesAndDirectories(std::vector<std::string>& copi
         
         // 更新进度 (Update progress)
         if (progress_callback) {
-            progress_callback(delete_items, total_items, "正在清理文件...", false, 0.0f);
+            progress_callback(delete_items, total_items, "正在清理文件...", false, 0.0f, "正在撤销安装", COLOR_RED);
         }
     }
     
@@ -2496,113 +2501,3 @@ void ModManager::cleanupCopiedFilesAndDirectories(std::vector<std::string>& copi
 
 
 
-// // 基于缓存路径删除文件 (Remove files based on cached paths)
-// bool ModManager::RemoveModFilesFromCache(ProgressCallback progress_callback,
-//                                         ErrorCallback error_callback,
-//                                         std::stop_token stop_token) {
-//     bool overall_success = true;
-//     size_t processed_files = 0;
-//     size_t total_files = cached_target_files.size();
-    
-//     std::string last_dir_path = ""; // 记录上一个文件的目录路径 (Record last file's directory path)
-    
-//     for (const std::string& target_file_path : cached_target_files) {
-//         // 检查是否需要停止 (Check if stop is requested)
-//         if (stop_token.stop_requested()) {
-            
-//             return false;
-//         }
-        
-//         // 直接使用缓存的目标路径，无需重新计算 (Directly use cached target path, no need to recalculate)
-        
-//         // 使用指针获取当前文件的目录路径，避免substr拷贝 (Use pointer to get current file's directory path, avoiding substr copy)
-//         size_t last_slash_pos = target_file_path.find_last_of('/');
-//         std::string current_dir;
-//         if (last_slash_pos != std::string::npos) {
-//             current_dir.assign(target_file_path.c_str(), last_slash_pos);
-//         }
-        
-//         // 检查父目录是否改变，如果改变了说明前一个目录的源MOD文件已清空 (Check if parent directory changed)
-//         if (!last_dir_path.empty() && current_dir != last_dir_path) {
-//             // 检查并删除上一个目录（如果为空） (Check and delete previous directory if empty)
-//             std::string check_dir = last_dir_path;
-//             while (!check_dir.empty() && check_dir.length() > target_directory_zip.length()) {
-//                 // 检查是否到达contents或exefs_patches目录，如果是则停止 (Check if reached contents or exefs_patches directory)
-//                 const char* relative_start = check_dir.c_str() + target_directory_zip.length();
-//                 if (strcmp(relative_start, "contents") == 0 || strcmp(relative_start, "exefs_patches") == 0) {
-//                     break; // 到达contents或exefs_patches目录，停止删除 (Reached contents or exefs_patches directory, stop deletion)
-//                 }
-                
-//                 // 尝试删除目录，只有在目录不为空时才停止 (Try to delete directory, only stop if directory is not empty)
-//                 if (remove(check_dir.c_str()) != 0) {
-//                     // 检查是否是因为目录不为空，如果是其他错误则继续 (Check if it's because directory is not empty)
-//                     if (errno == ENOTEMPTY || errno == EEXIST) {
-//                         break; // 目录不为空，停止向上检查 (Directory not empty, stop checking upward)
-//                     }
-//                 }
-                
-//                 // 移动到父目录，使用指针避免substr拷贝 (Move to parent directory, use pointer to avoid substr copy)
-//                 size_t parent_slash = check_dir.find_last_of('/');
-//                 if (parent_slash == std::string::npos || parent_slash <= target_directory_zip.length()) {
-//                     break;
-//                 }
-//                 check_dir.assign(check_dir.c_str(), parent_slash);
-//             }
-//         }
-        
-//         // 删除目标文件 (Delete target file)
-//         if (remove(target_file_path.c_str()) != 0) {
-//             if (errno != ENOENT) {
-//                 // 只有非"文件不存在"的错误才认为是真正的失败 (Only non-ENOENT errors are considered real failures)
-//                 overall_success = false;
-//                 if (error_callback) {
-//                     error_callback(UNINSTALLED_ERROR + target_file_path + ", errno: " + std::to_string(errno));
-//                 }
-//             }
-//             // ENOENT错误忽略，继续处理下一个文件 (Ignore ENOENT error, continue with next file)
-//         }
-        
-//         // 更新当前目录路径 (Update current directory path)
-//         last_dir_path = current_dir;
-//         processed_files++;
-        
-//         // 更新进度 (Update progress)
-//         if (progress_callback) {
-//             float progress_percentage = (float)processed_files / total_files * 100.0f;
-//             // 只显示文件名，不显示路径 (Show only filename, not path)
-//             const char* filename_ptr = target_file_path.c_str();
-//             const char* last_slash = strrchr(filename_ptr, '/');
-//             const char* display_name = last_slash ? last_slash + 1 : filename_ptr;
-//             progress_callback(processed_files, total_files, display_name, false, progress_percentage);
-//         }
-//     }
-    
-//     // 处理完所有文件后，清理最后一个目录 (Clean up the last directory after processing all files)
-//     if (!last_dir_path.empty()) {
-//         std::string check_dir = last_dir_path;
-//         while (!check_dir.empty() && check_dir.length() > target_directory_zip.length()) {
-//             // 检查是否到达contents或exefs_patches目录，如果是则停止 (Check if reached contents or exefs_patches directory)
-//             const char* relative_start = check_dir.c_str() + target_directory_zip.length();
-//             if (strcmp(relative_start, "contents") == 0 || strcmp(relative_start, "exefs_patches") == 0) {
-//                 break; // 到达contents或exefs_patches目录，停止删除 (Reached contents or exefs_patches directory, stop deletion)
-//             }
-            
-//             // 尝试删除目录，只有在目录不为空时才停止 (Try to delete directory, only stop if directory is not empty)
-//             if (remove(check_dir.c_str()) != 0) {
-//                 // 检查是否是因为目录不为空，如果是其他错误则继续 (Check if it's because directory is not empty)
-//                 if (errno == ENOTEMPTY || errno == EEXIST) {
-//                     break; // 目录不为空，停止向上检查 (Directory not empty, stop checking upward)
-//                 }
-//             }
-            
-//             // 移动到父目录，使用指针避免substr拷贝 (Move to parent directory, use pointer to avoid substr copy)
-//             size_t parent_slash = check_dir.find_last_of('/');
-//             if (parent_slash == std::string::npos || parent_slash <= target_directory_zip.length()) {
-//                 break;
-//             }
-//             check_dir.assign(check_dir.c_str(), parent_slash);
-//         }
-//     }
-    
-//     return overall_success;
-// }

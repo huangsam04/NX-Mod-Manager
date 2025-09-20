@@ -53,6 +53,9 @@ struct CopyProgressInfo {
     bool is_completed{false};             // 是否完成 (Whether completed)
     bool has_error{false};                // 是否有错误 (Whether has error)
     std::string error_message;     // 错误信息 (Error message)
+    std::string dialog_title{};  // 对话框标题
+    int progress_bar_color[3]{0, 150, 255}; // 进度条颜色 (Progress bar color)
+
     
     // 文件级进度相关字段 (File-level progress related fields)
     float file_progress_percentage{0.0f}; // 当前文件的复制进度百分比 (Current file copy progress percentage)
