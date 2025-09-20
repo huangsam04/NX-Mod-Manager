@@ -228,6 +228,16 @@ public:
                                   ErrorCallback error_callback);
     
     /**
+     * 清理已复制的文件和已创建的目录（用于copyFilesBatch中断时的清理）
+     * @param copied_files 已复制的文件路径列表
+     * @param progress_callback 进度回调函数
+     * @param total_items 总项目数（文件数+目录数）
+     */
+    void cleanupCopiedFilesAndDirectories(std::vector<std::string>& copied_files,
+                                         ProgressCallback progress_callback,
+                                         int total_items);
+    
+    /**
      * 规范化路径（统一路径分隔符）
      * @param path 原始路径
      * @return 规范化后的路径
@@ -255,4 +265,7 @@ public:
 private:
     // 缓存的目标文件路径列表，用于卸载时直接删除 (Cached target file paths for direct deletion during uninstall)
     std::vector<std::string> cached_target_files;
+    
+    // 缓存的已创建目录路径列表，用于清理时删除空目录 (Cached created directory paths for cleanup of empty directories)
+    std::vector<std::string> cached_created_directories;
 };

@@ -7634,17 +7634,8 @@ void App::newUpdateDialogCopyProgress(){
         // 取消安装和卸载任务
         if (copy_task.valid()) {
             copy_task.request_stop();
-            this->newHideDialog();
-
-            std::string MOD_NAME = this->mod_info[this->mod_index].MOD_NAME2;
-            bool MOD_STATE = this->mod_info[this->mod_index].MOD_STATE;
-
-            if (MOD_STATE || this->clean_button) {
-                newShowDialogConfirm(GetSnprintf(CANCEL_UNINSTALLED,MOD_NAME));
-            } else newShowDialogConfirm(GetSnprintf(CANCEL_INSTALLED,MOD_NAME));
-
-            
-            this->clean_button = false;
+            // 不立即隐藏对话框，让用户能看到清理进度
+            // 等异步任务完成后再处理UI切换
             return;
         }
 
@@ -7684,6 +7675,21 @@ void App::newUpdateDialogCopyProgress(){
         // 获取MOD的名字，还有安装状态
         std::string MOD_NAME = this->mod_info[this->mod_index].MOD_NAME2;
         bool MOD_STATE = this->mod_info[this->mod_index].MOD_STATE;
+
+        // 检查是否是因为用户中断而结束的任务
+        if (copy_task.get_token().stop_requested()) {
+            // 这是中断的情况，现在才隐藏进度对话框并显示确认对话框
+            this->newHideDialog();
+            
+            if (MOD_STATE || this->clean_button) {
+                newShowDialogConfirm(GetSnprintf(CANCEL_UNINSTALLED, MOD_NAME));
+            } else {
+                newShowDialogConfirm(GetSnprintf(CANCEL_INSTALLED, MOD_NAME));
+            }
+            
+            this->clean_button = false;
+            return;
+        }
 
         // 异步任务结束后运行
         if (task_result) {
