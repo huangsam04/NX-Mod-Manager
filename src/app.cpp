@@ -5682,14 +5682,18 @@ void App::MODinstallORuninstall(){
     bool version_pass = CompareModGameVersion(mod_version, game_version);
 
     std::string confirm_INSTALLED_text = CONFIRM_INSTALLED;
-    if(!version_pass){
+    if(!version_pass && !should_uninstall){
         this->audio_manager.PlayCancelSound();
         confirm_INSTALLED_text = CONFIRM_INSTALLED + VERSION_ERROR_TEXT;
     }
 
     // 显示确认对话框并传入回调函数 (Show confirmation dialog with callback function)
     if(should_uninstall){
-        newShowDialogConfirm(GetSnprintf(CONFIRM_UNINSTALLED, select_mod_name), callback);
+        if (!select_mod_state) {
+            this->audio_manager.PlayCancelSound();
+            newShowDialogConfirm(GetSnprintf("确认强制清理[%s]吗？\n\n注意：如果其他已安装的 MOD 中，恰好包含相同文件，会导致这个已安装的 MOD 出现异常。", select_mod_name), callback);
+        }
+        else newShowDialogConfirm(GetSnprintf(CONFIRM_UNINSTALLED, select_mod_name), callback);
     }else{
         newShowDialogConfirm(GetSnprintf(confirm_INSTALLED_text, select_mod_name), callback);
     }
@@ -7698,7 +7702,8 @@ void App::newUpdateDialogCopyProgress(){
         if (copy_task.get_token().stop_requested()) {
             // 这是中断的情况，现在才隐藏进度对话框并显示确认对话框
             this->newHideDialog();
-            
+            this->audio_manager.PlayCancelSound();
+
             if (MOD_STATE || this->clean_button) {
                 newShowDialogConfirm(GetSnprintf(CANCEL_UNINSTALLED, MOD_NAME));
             } else {
