@@ -53,8 +53,15 @@ bool ModManager::extractMod(const std::string& zip_path,
     const size_t SD_BLOCK_SIZE = 64 * 1024; // 64KB SD卡块大小
     const size_t ALIGNED_BUFFER_SIZE = 32 * 1024 * 1024; // 32MB 对齐缓冲区
     
+    // 资源管理变量 (Resource management variables)
+    char* aligned_buffer = nullptr;
+    mz_zip_reader_extract_iter_state* iter_state = nullptr;
+    FILE* dest_file = nullptr;
+    bool is_error = false;
+    bool is_stopped = false;
+    
     // 分配块对齐缓冲区 (Allocate block-aligned buffers)
-    char* aligned_buffer = (char*)memalign(SD_BLOCK_SIZE, ALIGNED_BUFFER_SIZE + SD_BLOCK_SIZE);
+    aligned_buffer = (char*)memalign(SD_BLOCK_SIZE, ALIGNED_BUFFER_SIZE + SD_BLOCK_SIZE);
     
     if (!aligned_buffer) {
         if (error_callback) {
@@ -69,21 +76,17 @@ bool ModManager::extractMod(const std::string& zip_path,
     for (int i = 0; i < num_files; i++) {
         // 检查是否需要停止 (Check if stop is requested)
         if (stop_token.stop_requested()) {
-            free(aligned_buffer);
-            // 先清理已安装内容
-            cleanupCopiedFilesAndDirectories(extracted_files,progress_callback,files_total);
-            return false;
+            is_stopped = true;
+            goto cleanup;
         }
         
         mz_zip_archive_file_stat file_stat;
         if (!mz_zip_reader_file_stat(zip_archive, i, &file_stat)) {
-            free(aligned_buffer);
-            // 安装发生错误，调用清理函数
-            cleanupCopiedFilesAndDirectories_forError(extracted_files,progress_callback,files_total);
+            is_error = true;
             if (error_callback) {
                 error_callback(ZIP_READ_ERROR + zip_path);
             }
-            return false;
+            goto cleanup;
         }
         
         // 跳过目录条目 (Skip directory entries)
@@ -99,38 +102,31 @@ bool ModManager::extractMod(const std::string& zip_path,
         
         // 再次检查是否需要停止 (Check again if stop is requested)
         if (stop_token.stop_requested()) {
-            free(aligned_buffer);
-            // 先清理已安装内容
-            cleanupCopiedFilesAndDirectories(extracted_files,progress_callback,files_total);
-            return false;
+            is_stopped = true;
+            goto cleanup;
         }
         
         // 创建流式解压迭代器 (Create streaming extraction iterator)
-        mz_zip_reader_extract_iter_state* iter_state = mz_zip_reader_extract_iter_new(zip_archive, i, 0);
+        iter_state = mz_zip_reader_extract_iter_new(zip_archive, i, 0);
         if (!iter_state) {
-            free(aligned_buffer);
-            // 安装发生错误，调用清理函数
-            cleanupCopiedFilesAndDirectories_forError(extracted_files,progress_callback,files_total);
+            is_error = true;
             if (error_callback) {
                 error_callback(CANT_READ_ERROR + std::string(file_stat.m_filename));
             }
-            return false;
+            goto cleanup;
         }
         
         size_t uncomp_size = file_stat.m_uncomp_size;
         long file_size = static_cast<long>(uncomp_size);
         
         // 打开目标文件 (Open destination file)
-        FILE* dest_file = fopen(target_file_path.c_str(), "wb");
+        dest_file = fopen(target_file_path.c_str(), "wb");
         if (!dest_file) {
-            mz_zip_reader_extract_iter_free(iter_state);
-            free(aligned_buffer);
-            // 安装发生错误，调用清理函数
-            cleanupCopiedFilesAndDirectories_forError(extracted_files,progress_callback,files_total);
+            is_error = true;
             if (error_callback) {
                 error_callback(CANT_CREATE_ERROR + target_file_path + ", errno: " + std::to_string(errno));
             }
-            return false;
+            goto cleanup;
         }
         
         // SD卡块对齐写入缓冲区 (SD Card block-aligned write buffer)
@@ -150,12 +146,8 @@ bool ModManager::extractMod(const std::string& zip_path,
         while (total_written < (size_t)file_size && file_success) {
             // 在文件解压过程中检查是否需要停止 (Check if stop is requested during file extraction)
             if (stop_token.stop_requested()) {
-                mz_zip_reader_extract_iter_free(iter_state);
-                fclose(dest_file);
-                free(aligned_buffer);
-                // 先清理已安装内容
-                cleanupCopiedFilesAndDirectories(extracted_files,progress_callback,files_total);
-                return false;
+                is_stopped = true;
+                goto cleanup;
             }
             
             // 计算块对齐的读取大小 (Calculate block-aligned read size)
@@ -163,19 +155,19 @@ bool ModManager::extractMod(const std::string& zip_path,
             size_t to_read = std::min(ALIGNED_BUFFER_SIZE, remaining);
             
             size_t bytes_read = mz_zip_reader_extract_iter_read(iter_state, aligned_buffer, to_read);
+            if (stop_token.stop_requested()) {
+                is_stopped = true;
+                goto cleanup;
+            }
             if (bytes_read > 0) {
                 // 写入实际读取的字节数，保持文件原始大小 (Write actual bytes read, maintain original file size)
                 if (fwrite(aligned_buffer, 1, bytes_read, dest_file) != bytes_read) {
                     // 写入失败，立即清理资源并停止安装 (Write failed, immediately cleanup and stop installation)
-                    mz_zip_reader_extract_iter_free(iter_state);
-                    fclose(dest_file);
-                    free(aligned_buffer);
-                    // 安装发生错误，调用清理函数
-                    cleanupCopiedFilesAndDirectories_forError(extracted_files,progress_callback,files_total);
+                    is_error = true;
                     if (error_callback) {
                         error_callback(CANT_WRITE_ERROR + target_file_path);
                     }
-                    return false;
+                    goto cleanup;
                 }
                 total_written += bytes_read;
                 
@@ -191,8 +183,14 @@ bool ModManager::extractMod(const std::string& zip_path,
         }
         
         // 关闭文件句柄和清理资源 (Close file handles and cleanup resources)
-        mz_zip_reader_extract_iter_free(iter_state);
-        fclose(dest_file);
+        if (iter_state) {
+            mz_zip_reader_extract_iter_free(iter_state);
+            iter_state = nullptr;
+        }
+        if (dest_file) {
+            fclose(dest_file);
+            dest_file = nullptr;
+        }
         
         // 文件处理成功，更新计数器 (File processed successfully, update counter)
         processed_files++;
@@ -203,11 +201,36 @@ bool ModManager::extractMod(const std::string& zip_path,
         }
     }
     
-    // 清理块对齐缓冲区 (Clean up block-aligned buffers)
-    free(aligned_buffer);
-    
-    // 如果执行到这里，说明所有文件都成功处理 (If we reach here, all files were processed successfully)
+    // 正常完成，清理缓冲区并返回成功 (Normal completion, cleanup buffer and return success)
+    if (aligned_buffer) {
+        free(aligned_buffer);
+        aligned_buffer = nullptr;
+    }
     return true;
+
+cleanup:
+    // 统一资源清理 (Unified resource cleanup)
+    if (iter_state) {
+        mz_zip_reader_extract_iter_free(iter_state);
+        iter_state = nullptr;
+    }
+    if (dest_file) {
+        fclose(dest_file);
+        dest_file = nullptr;
+    }
+    if (aligned_buffer) {
+        free(aligned_buffer);
+        aligned_buffer = nullptr;
+    }
+    
+    // 根据错误类型调用相应的清理函数 (Call appropriate cleanup function based on error type)
+    if (is_error) {
+        cleanupCopiedFilesAndDirectories_forError(extracted_files, progress_callback, files_total);
+    } else if (is_stopped) {
+        cleanupCopiedFilesAndDirectories(extracted_files, progress_callback, files_total);
+    }
+    
+    return false;
 }
 
 // // 带聚合的速度不如顺序的，备用不删了
