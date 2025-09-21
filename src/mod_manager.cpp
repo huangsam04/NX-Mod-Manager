@@ -2353,7 +2353,7 @@ void ModManager::GetConflictingModNames(const std::string& mod_dir_path,const st
     }
     
     if (progress_callback) {
-        progress_callback(0, 0, "正在检查冲突的MOD...", false, 0.0f, "", COLOR_BLUE);
+        progress_callback(0, 0, "正在检查冲突的MOD...", false, 0.0f, "安装错误", COLOR_BLUE);
     }
 
     // 从/mods2/游戏名/ID/模组名固定格式提取/mods2/游戏名/ID
@@ -2371,7 +2371,7 @@ void ModManager::GetConflictingModNames(const std::string& mod_dir_path,const st
     // 检查是否为空
     if (installed_mod_paths.empty()) {
         if (error_callback) {
-            error_callback("获取到的列表为空，未发现冲突的MOD，可能是用户手动安装的MOD冲突！");
+            error_callback("未检出冲突MOD，\n请按Y键清理当前mod后再尝试安装！");
         }
         return;
     }
@@ -2379,18 +2379,15 @@ void ModManager::GetConflictingModNames(const std::string& mod_dir_path,const st
     int installed_mod_count = static_cast<int>(installed_mod_paths.size());
 
     if (progress_callback) {
-        progress_callback(0, installed_mod_count, "正在检查冲突的MOD...", false, 0.0f, "", COLOR_BLUE);
+        progress_callback(0, installed_mod_count, "正在检查冲突的MOD...", false, 0.0f, "安装错误", COLOR_BLUE);
     }
     
 
     // 分离出/contents/XXXXXX
     std::string contents_path = conflicting_file_Path;
-    if (contents_path.find("/atmosphere/") == 0) {
-        contents_path = contents_path.substr(12); // 去掉"/atmosphere/"(12个字符)
-    } else if (error_callback) {
-        error_callback("未发现冲突的MOD，可能是用户手动安装的MOD冲突！");
-        return;
-    }
+    // 去掉"/atmosphere/"(12个字符)
+    contents_path = contents_path.substr(12);
+    
 
     // 初始化ZIP读取器，避免循环内频繁初始化
     mz_zip_archive zip_archive;
@@ -2408,11 +2405,11 @@ void ModManager::GetConflictingModNames(const std::string& mod_dir_path,const st
             return;
         }
 
-        
+        // 获取当前mod的映射名
         current_mod_name = GetModJsonName(mod_path);
         // 更新进度条 - 在循环开始时更新    
         if (progress_callback) {
-            progress_callback(processed_mod_count, installed_mod_count, current_mod_name, false, 0.0f, "", COLOR_BLUE);
+            progress_callback(processed_mod_count, installed_mod_count, current_mod_name, false, 0.0f, "安装错误", COLOR_BLUE);
         }
         
         //  会检测是否为ZIPMOD，是的话返回ZIPMOD的路径，否则返回空字符串
@@ -2422,7 +2419,7 @@ void ModManager::GetConflictingModNames(const std::string& mod_dir_path,const st
         if (zip_mod_path.empty()) {
             std::string installed_mod_conflicting_file_Path = mod_path + "/" + contents_path;
             if (access(installed_mod_conflicting_file_Path.c_str(), F_OK) == 0) {
-                mod_conflicting_name = mod_conflicting_name + "[" + current_mod_name + "] ";
+                mod_conflicting_name = mod_conflicting_name + current_mod_name + "，";
             }
             processed_mod_count++;
             continue;
@@ -2445,22 +2442,23 @@ void ModManager::GetConflictingModNames(const std::string& mod_dir_path,const st
 
         // 如果找到了文件（file_index >= 0），说明存在冲突
         if (file_index >= 0) {
-            mod_conflicting_name = mod_conflicting_name + "[" + current_mod_name + "] ";
+            mod_conflicting_name = mod_conflicting_name + current_mod_name + "，";
         }
         processed_mod_count++;
 
     }
 
+    // 代表检测到了冲突的MOD
     if (!mod_conflicting_name.empty()) {
         if (error_callback) {
-            error_callback("发现冲突的MOD：" + mod_conflicting_name + "\n冲突文件：" + contents_path);
+            error_callback("冲突的MOD：" + mod_conflicting_name + "\n冲突的文件：" + contents_path);
         }
         return;
-    }
+    } 
 
-    // 所有已安装mod中未找到冲突文件
+    // 所有mod中未找到冲突文件
     if (error_callback) {
-        error_callback("循环结束为发现，未发现冲突的MOD，可能是用户手动安装的MOD冲突！");
+        error_callback("未检出冲突MOD，\n请按Y键清理当前mod后再尝试安装！");
     }
 
 }
