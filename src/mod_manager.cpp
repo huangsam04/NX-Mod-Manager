@@ -2204,10 +2204,7 @@ bool ModManager::Removemodeformodlist(const std::string& mod_dir_path,ErrorCallb
 
     // 尝试删除mod目录,失败不管他。
     if (remove(mod_dir_path.c_str()) != 0) {
-        // if (error_callback) {
-        //     error_callback("删除MOD目录失败，请检查！\n" + mod_dir_path);
-        // }
-        // return false;
+        
     }
 
 
@@ -2391,7 +2388,7 @@ void ModManager::GetConflictingModNames(const std::string& mod_dir_path,const st
     }
     
     if (progress_callback) {
-        progress_callback(0, 0, "正在检查冲突的MOD...", false, 0.0f, "安装错误", COLOR_BLUE);
+        progress_callback(0, 0, CHECK_COLLISION_TEXT, false, 0.0f, INSTALL_ERROR_DIALOG_TIELE, COLOR_BLUE);
     }
 
     // 从/mods2/游戏名/ID/模组名固定格式提取/mods2/游戏名/ID
@@ -2409,7 +2406,7 @@ void ModManager::GetConflictingModNames(const std::string& mod_dir_path,const st
     // 检查是否为空
     if (installed_mod_paths.empty()) {
         if (error_callback) {
-            error_callback("未检出冲突MOD，\n请按Y键清理当前mod后再尝试安装！");
+            error_callback(NO_COLLISION_MOD_FOUND);
         }
         return;
     }
@@ -2417,7 +2414,7 @@ void ModManager::GetConflictingModNames(const std::string& mod_dir_path,const st
     int installed_mod_count = static_cast<int>(installed_mod_paths.size());
 
     if (progress_callback) {
-        progress_callback(0, installed_mod_count, "正在检查冲突的MOD...", false, 0.0f, "安装错误", COLOR_BLUE);
+        progress_callback(0, installed_mod_count, CHECK_COLLISION_TEXT, false, 0.0f, INSTALL_ERROR_DIALOG_TIELE, COLOR_BLUE);
     }
     
 
@@ -2447,7 +2444,7 @@ void ModManager::GetConflictingModNames(const std::string& mod_dir_path,const st
         current_mod_name = GetModJsonName(mod_path);
         // 更新进度条 - 在循环开始时更新    
         if (progress_callback) {
-            progress_callback(processed_mod_count, installed_mod_count, current_mod_name, false, 0.0f, "安装错误", COLOR_BLUE);
+            progress_callback(processed_mod_count, installed_mod_count, current_mod_name, false, 0.0f, INSTALL_ERROR_DIALOG_TIELE, COLOR_BLUE);
         }
         
         //  会检测是否为ZIPMOD，是的话返回ZIPMOD的路径，否则返回空字符串
@@ -2489,15 +2486,19 @@ void ModManager::GetConflictingModNames(const std::string& mod_dir_path,const st
     // 代表检测到了冲突的MOD
     if (!mod_conflicting_name.empty()) {
         mod_conflicting_name = mod_conflicting_name.substr(0, mod_conflicting_name.size() - 3);
+        // 格式化冲突MOD信息到COLLISION_MOD_FOUND字符串中
+        char formatted_message[1024];
+        snprintf(formatted_message, sizeof(formatted_message), COLLISION_MOD_FOUND.c_str(), mod_conflicting_name.c_str(), contents_path.c_str());
+        std::string collision_message = formatted_message;
         if (error_callback) {
-            error_callback("冲突的MOD：" + mod_conflicting_name + "\n\n冲突的文件：" + contents_path);
+            error_callback(collision_message);
         }
         return;
     } 
 
     // 所有mod中未找到冲突文件
     if (error_callback) {
-        error_callback("未检出冲突MOD，\n请按Y键清理当前mod后再尝试安装！\n\n冲突的文件：" + contents_path);
+        error_callback(NO_COLLISION_MOD_FOUND + contents_path);
     }
 
 }
@@ -2515,7 +2516,7 @@ void ModManager::cleanupCopiedFilesAndDirectories(std::vector<std::string>& copi
         
         // 更新进度 (Update progress)
         if (progress_callback) {
-            progress_callback(delete_items, total_items, "正在清理文件...", false, 0.0f, "正在撤销安装", COLOR_RED);
+            progress_callback(delete_items, total_items, CLEANING_FILE_DIALOG_TIELE, false, 0.0f, BEING_UNINSTALLED_DIALOG_TIELE, COLOR_RED);
         }
     }
     
@@ -2573,7 +2574,7 @@ void ModManager::cleanupCopiedFilesAndDirectories_forError(std::vector<std::stri
         
         // 更新进度 (Update progress)
         if (progress_callback) {
-            progress_callback(delete_items, total_items, "正在清理文件...", false, 0.0f, "安装错误", COLOR_RED);
+            progress_callback(delete_items, total_items, CLEANING_FILE_DIALOG_TIELE, false, 0.0f, INSTALL_ERROR_DIALOG_TIELE, COLOR_RED);
         }
     }
     

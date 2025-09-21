@@ -140,7 +140,15 @@
 "MTP_READING_DONE_TAG": "[Read Done]:",
 "MTP_WRITEING_PROGRESS_TAG": "[Writing]: Written [color=BLUE]%.1fMB[/color], Speed [color=BLUE]%.1fMB/s[/color], File: [color=BLUE]%s[/color]",
 "MTP_READING_PROGRESS_TAG": "[Reading]: Read [color=BLUE]%.1fMB[/color], Speed [color=BLUE]%.1fMB/s[/color], File: [color=BLUE]%s[/color]",
-"LIST_DIALOG_MTP": "MTP Transfer"
+"LIST_DIALOG_MTP": "MTP Transfer",
+
+"FORCE_CLEAN_CONFIRM": "Confirm force clean [%s]?\n\nNote: Same files in other installed MODs will cause errors.",
+"INSTALL_ERROR_DIALOG_TIELE": "Install Error",
+"BEING_UNINSTALLED_DIALOG_TIELE": "Reverting Installation",
+"CHECK_COLLISION_TEXT": "Checking conflicting MODs...",
+"CLEANING_FILE_DIALOG_TIELE": "Cleaning files...",
+"NO_COLLISION_MOD_FOUND": "No conflicting MODs found.\nPress Y to clean current mod and retry.\nIf still conflicting, may be manually installed.\n\nConflicting file: %s",
+"COLLISION_MOD_FOUND": "Conflicting MOD: %s\n\nConflicting file: %s"
 
 
 

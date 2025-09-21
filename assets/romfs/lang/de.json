@@ -140,7 +140,15 @@
 "MTP_READING_DONE_TAG": "[Lesen abgeschlossen]:",
 "MTP_WRITEING_PROGRESS_TAG": "[Schreibe]: Geschrieben [color=BLUE]%.1fMB[/color], Geschw. [color=BLUE]%.1fMB/s[/color], Datei: [color=BLUE]%s[/color]",
 "MTP_READING_PROGRESS_TAG": "[Lese]: Gelesen [color=BLUE]%.1fMB[/color], Geschw. [color=BLUE]%.1fMB/s[/color], Datei: [color=BLUE]%s[/color]",
-"LIST_DIALOG_MTP": "MTP-Übertragung"
+"LIST_DIALOG_MTP": "MTP-Übertragung",
+
+"FORCE_CLEAN_CONFIRM": "Zwingende Bereinigung [%s] bestätigen?\n\nHinweis: Gleiche Dateien in anderen MODs verursachen Fehler.",
+"INSTALL_ERROR_DIALOG_TIELE": "Installationsfehler",
+"BEING_UNINSTALLED_DIALOG_TIELE": "Installation rückgängig machen",
+"CHECK_COLLISION_TEXT": "Konflikt-MODs prüfen...",
+"CLEANING_FILE_DIALOG_TIELE": "Dateien bereinigen...",
+"NO_COLLISION_MOD_FOUND": "Keine Konflikt-MODs gefunden.\nDrücke Y, um aktuellen MOD zu bereinigen und erneut zu versuchen.\nBei weiterhin Konflikten könnte es manuell installiert sein.\n\nKonfliktdatei: %s",
+"COLLISION_MOD_FOUND": "Konflikt-MOD: %s\n\nKonfliktdatei: %s"
 
 
 

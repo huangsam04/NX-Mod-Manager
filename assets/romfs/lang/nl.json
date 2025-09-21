@@ -140,7 +140,14 @@
 "MTP_READING_DONE_TAG": "[Lezen voltooid]:",
 "MTP_WRITEING_PROGRESS_TAG": "[Schrijven]: Geschreven [color=BLUE]%.1fMB[/color], Snelheid [color=BLUE]%.1fMB/s[/color], Bestand: [color=BLUE]%s[/color]",
 "MTP_READING_PROGRESS_TAG": "[Lezen]: Gelezen [color=BLUE]%.1fMB[/color], Snelheid [color=BLUE]%.1fMB/s[/color], Bestand: [color=BLUE]%s[/color]",
-"LIST_DIALOG_MTP": "MTP-overdracht"
+"LIST_DIALOG_MTP": "MTP-overdracht",
+"FORCE_CLEAN_CONFIRM": "Bevestig forceer opschonen [%s]?\n\nOpmerking: Identieke bestanden in andere geïnstalleerde MOD's veroorzaken fouten.",
+"INSTALL_ERROR_DIALOG_TIELE": "Installatiefout",
+"BEING_UNINSTALLED_DIALOG_TIELE": "Installatie annuleren",
+"CHECK_COLLISION_TEXT": "Controleren op conflicterende MOD's...",
+"CLEANING_FILE_DIALOG_TIELE": "Bestanden opschonen...",
+"NO_COLLISION_MOD_FOUND": "Geen conflicterende MOD's gevonden.\nDruk Y om huidige mod op te schonen en opnieuw te proberen installeren.\nIndien nog steeds conflict, is het mogelijk een handmatig geïnstalleerde MOD.\n\nConflicterend bestand: %s",
+"COLLISION_MOD_FOUND": "Conflicterende MOD: %s\n\nConflicterend bestand: %s"
 
 
 

@@ -140,7 +140,14 @@
 "MTP_READING_DONE_TAG" : "[Leitura concluída]:",
 "MTP_WRITEING_PROGRESS_TAG" : "[Escrevendo]: Escritos [color=BLUE]%.1fMB[/color], velocidade [color=BLUE]%.1fMB/s[/color], arquivo: [color=BLUE]%s[/color]",
 "MTP_READING_PROGRESS_TAG" : "[Lendo]: Lidos [color=BLUE]%.1fMB[/color], velocidade [color=BLUE]%.1fMB/s[/color], arquivo: [color=BLUE]%s[/color]",
-"LIST_DIALOG_MTP":"Transferência MTP"
+"LIST_DIALOG_MTP":"Transferência MTP",
+"FORCE_CLEAN_CONFIRM": "Confirmar limpeza forçada [%s]?\n\nNota: Arquivos idênticos em outros MODs instalados causarão erros.",
+"INSTALL_ERROR_DIALOG_TIELE": "Erro de instalação",
+"BEING_UNINSTALLED_DIALOG_TIELE": "Cancelando instalação",
+"CHECK_COLLISION_TEXT": "Verificando MODs em conflito...",
+"CLEANING_FILE_DIALOG_TIELE": "Limpando arquivos...",
+"NO_COLLISION_MOD_FOUND": "Nenhum MOD em conflito encontrado.\nPressione Y para limpar o mod atual e tentar instalar novamente.\nSe ainda houver conflito, pode ser um MOD instalado manualmente.\n\nArquivo em conflito: %s",
+"COLLISION_MOD_FOUND": "MOD em conflito: %s\n\nArquivo em conflito: %s"
 
 
 

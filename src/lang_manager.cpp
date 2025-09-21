@@ -149,6 +149,13 @@ std::string MTP_WRITEING_PROGRESS_TAG;
 std::string MTP_READING_PROGRESS_TAG;
 std::string MTP_CREATE_FILE_TAG;
 std::string LIST_DIALOG_MTP;
+std::string FORCE_CLEAN_CONFIRM;
+std::string INSTALL_ERROR_DIALOG_TIELE;
+std::string BEING_UNINSTALLED_DIALOG_TIELE;
+std::string CHECK_COLLISION_TEXT;
+std::string CLEANING_FILE_DIALOG_TIELE;
+std::string NO_COLLISION_MOD_FOUND;
+std::string COLLISION_MOD_FOUND;
 
 namespace tj {
 
@@ -466,9 +473,14 @@ bool LangManager::loadLanguage(const std::string& langCode) {
             {"MTP_READING_PROGRESS_TAG", std::ref(MTP_READING_PROGRESS_TAG)},
             {"LIST_DIALOG_MTP", std::ref(LIST_DIALOG_MTP)},
             {"MTP_CREATE_FILE_TAG", std::ref(MTP_CREATE_FILE_TAG)},
-            
-
-            
+            {"FORCE_CLEAN_CONFIRM", std::ref(FORCE_CLEAN_CONFIRM)},
+            {"INSTALL_ERROR_DIALOG_TIELE", std::ref(INSTALL_ERROR_DIALOG_TIELE)},
+            {"BEING_UNINSTALLED_DIALOG_TIELE", std::ref(BEING_UNINSTALLED_DIALOG_TIELE)},
+            {"CHECK_COLLISION_TEXT", std::ref(CHECK_COLLISION_TEXT)},
+            {"CLEANING_FILE_DIALOG_TIELE", std::ref(CLEANING_FILE_DIALOG_TIELE)},
+            {"NO_COLLISION_MOD_FOUND", std::ref(NO_COLLISION_MOD_FOUND)},
+            {"COLLISION_MOD_FOUND", std::ref(COLLISION_MOD_FOUND)},
+          
 
         };
 

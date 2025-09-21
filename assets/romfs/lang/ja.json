@@ -140,7 +140,14 @@
 "MTP_READING_DONE_TAG": "[読み込み完了]：",
 "MTP_WRITEING_PROGRESS_TAG": "[書き込み中]：書き込み済み [color=BLUE]%.1fMB[/color]、速度 [color=BLUE]%.1fMB/s[/color]、ファイル：[color=BLUE]%s[/color]",
 "MTP_READING_PROGRESS_TAG": "[読み込み中]：読み込み済み [color=BLUE]%.1fMB[/color]、速度 [color=BLUE]%.1fMB/s[/color]、ファイル：[color=BLUE]%s[/color]",
-"LIST_DIALOG_MTP": "MTP転送"
+"LIST_DIALOG_MTP": "MTP転送",
+"FORCE_CLEAN_CONFIRM": "強制クリーン[%s]を確認？\n\n注意：他のMODに同ファイルがあると異常が発生します。",
+"INSTALL_ERROR_DIALOG_TIELE": "インストールエラー",
+"BEING_UNINSTALLED_DIALOG_TIELE": "インストールを取り消し中",
+"CHECK_COLLISION_TEXT": "競合MODを確認中...",
+"CLEANING_FILE_DIALOG_TIELE": "ファイルをクリーン中...",
+"NO_COLLISION_MOD_FOUND": "競合MODが検出されませんでした。\nYキーを押して現在のMODをクリーンして再試行してください。\n依然として競合する場合は、手動でインストールされた可能性があります。\n\n競合ファイル：%s",
+"COLLISION_MOD_FOUND": "競合MOD：%s\n\n競合ファイル：%s"
 
 
 

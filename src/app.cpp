@@ -5598,13 +5598,7 @@ void App::ChangeModName() {
         // 重命名成功，更新模组信息
         current_mod.MOD_STATE = !current_mod.MOD_STATE;
         current_mod.MOD_PATH = new_path;
-    } else {
-        newHideDialog();
-        std::string aaaa = "为安装";
-        if (current_mod.MOD_STATE) aaaa = "已安装\n";
-        newShowDialogConfirm(aaaa+"重命名目录失败" + current_path + " -> " + new_path+"error："+strerror(errno));
-
-    }
+    } 
     // 如果重命名失败，不做任何更改
 }
 
@@ -5691,7 +5685,7 @@ void App::MODinstallORuninstall(){
     if(should_uninstall){
         if (!select_mod_state) {
             this->audio_manager.PlayCancelSound();
-            newShowDialogConfirm(GetSnprintf("确认强制清理[%s]吗？\n\n注意：如果其他已安装的 MOD 中，恰好包含相同文件，会导致这个已安装的 MOD 出现异常。", select_mod_name), callback);
+            newShowDialogConfirm(GetSnprintf(FORCE_CLEAN_CONFIRM, select_mod_name), callback);
         }
         else newShowDialogConfirm(GetSnprintf(CONFIRM_UNINSTALLED, select_mod_name), callback);
     }else{

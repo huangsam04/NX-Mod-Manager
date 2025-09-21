@@ -140,7 +140,15 @@
 "MTP_READING_DONE_TAG" : "[读取完成]：",
 "MTP_WRITEING_PROGRESS_TAG" : "[正在写入]：已写入[color=BLUE]%.1fMB[/color]，速度[color=BLUE]%.1fMB/s[/color]，文件：[color=BLUE]%s[/color]",
 "MTP_READING_PROGRESS_TAG" : "[正在读取]：已读取[color=BLUE]%.1fMB[/color]， 速度[color=BLUE]%.1fMB/s[/color]，文件：[color=BLUE]%s[/color]",
-"LIST_DIALOG_MTP":"MTP传输"
+"LIST_DIALOG_MTP":"MTP传输",
+"FORCE_CLEAN_CONFIRM": "确认强制清理[%s]吗？\n\n注意：如果其他已安装的 MOD 中，恰好包含相同文件，会导致这个已安装的 MOD 出现异常。",
+"INSTALL_ERROR_DIALOG_TIELE": "安装错误",
+"BEING_UNINSTALLED_DIALOG_TIELE": "正在撤销安装",
+"CHECK_COLLISION_TEXT": "正在检查冲突的MOD...",
+"CLEANING_FILE_DIALOG_TIELE": "正在清理文件...",
+"NO_COLLISION_MOD_FOUND": "未检出冲突的MOD，\n请按Y键清理当前mod后再尝试安装。\n若依旧冲突，可能是用户手动安装的MOD。\n\n冲突的文件：%s",
+"COLLISION_MOD_FOUND": "冲突的MOD：%s\n\n冲突的文件：%s"
+
 
 
 

@@ -149,6 +149,13 @@ extern std::string MTP_WRITEING_PROGRESS_TAG;
 extern std::string MTP_READING_PROGRESS_TAG;
 extern std::string MTP_CREATE_FILE_TAG;
 extern std::string LIST_DIALOG_MTP;
+extern std::string FORCE_CLEAN_CONFIRM;
+extern std::string INSTALL_ERROR_DIALOG_TIELE;
+extern std::string BEING_UNINSTALLED_DIALOG_TIELE;
+extern std::string CHECK_COLLISION_TEXT;
+extern std::string CLEANING_FILE_DIALOG_TIELE;
+extern std::string NO_COLLISION_MOD_FOUND;
+extern std::string COLLISION_MOD_FOUND;
 
 
 namespace tj {
