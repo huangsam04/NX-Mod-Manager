@@ -5612,17 +5612,17 @@ void App::Sort_Mod() {
         }
         
         // 在相同安装状态下，按类型排序 (Within same installation status, sort by type)
-        // 定义类型优先级：有类型的在前面，无类型的在后面 (Define type priority: with type first, without type last)
-        bool a_has_type = !a.MOD_TYPE.empty();
-        bool b_has_type = !b.MOD_TYPE.empty();
+        // 定义类型优先级：有具体类型的在前面，无类型(NONE_TYPE_TEXT)的在后面 (Define type priority: with specific type first, without type(NONE_TYPE_TEXT) last)
+        bool a_has_type = (a.MOD_TYPE != NONE_TYPE_TEXT);
+        bool b_has_type = (b.MOD_TYPE != NONE_TYPE_TEXT);
         
         if (a_has_type != b_has_type) {
-            return a_has_type > b_has_type; // 有类型的排在前面 (With type first)
+            return a_has_type > b_has_type; // 有具体类型的排在前面 (With specific type first)
         }
         
-        // 如果都有类型或都没有类型，按类型和拼音排序 (If both have type or both don't have type, sort by type and pinyin)
+        // 如果都有具体类型或都是无类型(NONE_TYPE_TEXT)，按类型和拼音排序 (If both have specific type or both are NONE_TYPE_TEXT, sort by type and pinyin)
         if (a_has_type && b_has_type) {
-            // 都有类型，先按类型字符串排序，类型相同则按名称拼音排序 (Both have type, sort by type string first, then by name pinyin if same type)
+            // 都有具体类型，先按类型字符串排序，类型相同则按名称拼音排序 (Both have specific type, sort by type string first, then by name pinyin if same type)
             if (a.MOD_TYPE != b.MOD_TYPE) {
                 return a.MOD_TYPE < b.MOD_TYPE; // 直接按类型字符串排序 (Sort directly by type string)
             }
@@ -5630,7 +5630,7 @@ void App::Sort_Mod() {
             std::string pinyin_b = this->GetFirstCharPinyin(b.MOD_NAME2);
             return pinyin_a < pinyin_b; // 类型相同，按名称拼音顺序 (Same type, sort by name pinyin)
         } else {
-            // 都没有类型，直接按名称拼音排序 (Both don't have type, sort by name pinyin directly)
+            // 都是无类型(NONE_TYPE_TEXT)，直接按名称拼音排序 (Both are NONE_TYPE_TEXT, sort by name pinyin directly)
             std::string pinyin_a = this->GetFirstCharPinyin(a.MOD_NAME2);
             std::string pinyin_b = this->GetFirstCharPinyin(b.MOD_NAME2);
             return pinyin_a < pinyin_b; // 按名称拼音顺序 (Sort by name pinyin)
