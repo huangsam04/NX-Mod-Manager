@@ -1,20 +1,40 @@
 #include "haze/threaded_file_transfer.hpp"
 #include "haze/thread.hpp"
 #include "haze/log.hpp"
+// can't include because circular dependency :/
+// #include "haze/ptp_responder_types.hpp"
 
 #include <vector>
 #include <algorithm>
 #include <cstring>
 #include <atomic>
+#include <new>
 
 namespace sphaira::thread {
 namespace {
 
-constexpr u64 BUFFER_SIZE = 1024*1024*1;
+constexpr u64 BUFFER_SIZE_ALLOC = std::max(BUFFER_SIZE_READ, BUFFER_SIZE_WRITE);
+
+struct ScopedMutex {
+    ScopedMutex(Mutex* mutex) : m_mutex{mutex} {
+        mutexLock(m_mutex);
+    }
+    ~ScopedMutex() {
+        mutexUnlock(m_mutex);
+    }
+
+    ScopedMutex(const ScopedMutex&) = delete;
+    void operator=(const ScopedMutex&) = delete;
+
+private:
+    Mutex* const m_mutex;
+};
+
+#define SCOPED_MUTEX(_m) ScopedMutex ANONYMOUS_VARIABLE(SCOPE_EXIT_STATE_){_m}
 
 struct ThreadBuffer {
     ThreadBuffer() {
-        buf.reserve(BUFFER_SIZE);
+        buf.reserve(BUFFER_SIZE_ALLOC);
     }
 
     std::vector<u8> buf;
@@ -94,6 +114,7 @@ struct ThreadData {
     Result writeFuncInternal();
 
 private:
+    bool IsWriteBufFull();
     Result SetWriteBuf(std::vector<u8>& buf, s64 size);
     Result GetWriteBuf(std::vector<u8>& buf_out, s64& off_out);
 
@@ -111,7 +132,9 @@ private:
     CondVar can_read{};
     CondVar can_write{};
 
-    RingBuf<2> write_buffers{};
+    // ajdust if needed.
+    // using 1 as internally its triple buffered anyway (r/w have their own buffers).
+    RingBuf<1> write_buffers{};
 
     const u64 read_buffer_size;
     const s64 write_size;
@@ -152,10 +175,24 @@ void ThreadData::WakeAllThreads() {
     mutexUnlock(std::addressof(mutex));
 }
 
+bool ThreadData::IsWriteBufFull() {
+    SCOPED_MUTEX(std::addressof(mutex));
+
+    // use condvar instead of waiting a set time as the buffer may be freed immediately.
+    // however, to avoid deadlocks, we still need a timeout
+    if (!write_buffers.ringbuf_free()) {
+        if (R_FAILED(condvarWaitTimeout(std::addressof(can_read), std::addressof(mutex), 1e+8))) { // 100ms
+            return true;
+        }
+    }
+
+    return !write_buffers.ringbuf_free();
+}
+
 Result ThreadData::SetWriteBuf(std::vector<u8>& buf, s64 size) {
     buf.resize(size);
 
-    mutexLock(std::addressof(mutex));
+    SCOPED_MUTEX(std::addressof(mutex));
     if (!write_buffers.ringbuf_free()) {
         if (!write_running) {
             R_SUCCEED();
@@ -166,14 +203,13 @@ Result ThreadData::SetWriteBuf(std::vector<u8>& buf, s64 size) {
         haze::log_write("SetWriteBuf: got space!\n");
     }
 
-    ON_SCOPE_EXIT { mutexUnlock(std::addressof(mutex)); };
     R_TRY(GetResults());
     write_buffers.ringbuf_push(buf, 0);
     return condvarWakeOne(std::addressof(can_write));
 }
 
 Result ThreadData::GetWriteBuf(std::vector<u8>& buf_out, s64& off_out) {
-    mutexLock(std::addressof(mutex));
+    SCOPED_MUTEX(std::addressof(mutex));
     if (!write_buffers.ringbuf_size()) {
         if (!read_running) {
             buf_out.resize(0);
@@ -185,7 +221,6 @@ Result ThreadData::GetWriteBuf(std::vector<u8>& buf_out, s64& off_out) {
         haze::log_write("GetWriteBuf: got data!\n");
     }
 
-    ON_SCOPE_EXIT { mutexUnlock(std::addressof(mutex)); };
     R_TRY(GetResults());
     write_buffers.ringbuf_pop(buf_out, off_out);
     return condvarWakeOne(std::addressof(can_read));
@@ -205,20 +240,56 @@ Result ThreadData::readFuncInternal() {
     // the main buffer which data is read into.
     std::vector<u8> buf;
     buf.reserve(this->read_buffer_size);
+    bool slow_mode{};
 
     while (this->read_offset < this->write_size && R_SUCCEEDED(this->GetResults())) {
-        // read more data
+        // this will wait for max 100ms until the buffer has space.
+        const auto is_write_full = this->IsWriteBufFull();
+
+        // check if the write thread returned early, usually due to an error.
+        if (is_write_full && !write_running) {
+            haze::log_write("ReadFunc: write thread exited, stopping read thread\n");
+            break;
+        }
+
+        if (!slow_mode && is_write_full) {
+            slow_mode = true;
+            haze::log_write("ReadFunc: switching to slow mode\n");
+        } else if (slow_mode && !is_write_full) {
+            slow_mode = false;
+            haze::log_write("ReadFunc: switching to fast mode\n");
+        }
+
         s64 read_size = this->read_buffer_size;
+        if (slow_mode) {
+            // reduce transfer rate in order to prevent windows from freezing.
+            read_size = 2048; // UsbBulkSlowModePacketBufferSize.
+        }
+
+        const auto buf_offset = buf.size();
+        buf.resize(buf_offset + read_size);
 
         u64 bytes_read{};
-        buf.resize(read_size);
-        R_TRY(this->Read(buf.data(), read_size, std::addressof(bytes_read)));
+        R_TRY(this->Read(buf.data() + buf_offset, read_size, std::addressof(bytes_read)));
         if (!bytes_read) {
             break;
         }
 
-        const auto buf_size = bytes_read;
-        R_TRY(this->SetWriteBuf(buf, buf_size));
+        // resize to actual read size.
+        buf.resize(buf_offset + bytes_read);
+
+        // when we have left slow mode, flush.
+        // todo: check buffer size so that it doesn't grow too large.
+        if (!slow_mode) {
+            R_TRY(this->SetWriteBuf(buf, buf.size()));
+            buf.clear();
+        }
+    }
+
+    // flush buffer if needed.
+    if (!buf.empty()) {
+        haze::log_write("ReadFunc: flushing final buffer of size %zu\n", buf.size());
+        R_TRY(this->SetWriteBuf(buf, buf.size()));
     }
 
     R_SUCCEED();
@@ -256,7 +327,7 @@ void writeFunc(void* d) {
     t->SetWriteResult(t->writeFuncInternal());
 }
 
-Result TransferInternal(s64 size, const ReadCallback& rfunc, const WriteCallback& wfunc, Mode mode, u64 buffer_size = BUFFER_SIZE) {
+Result TransferInternal(s64 size, const ReadCallback& rfunc, const WriteCallback& wfunc, u64 buffer_size, Mode mode) {
     if (mode == Mode::SingleThreadedIfSmaller) {
         if ((u64)size <= buffer_size) {
             mode = Mode::SingleThreaded;
@@ -330,8 +401,8 @@ Result TransferInternal(s64 size, const ReadCallback& rfunc, const WriteCallback
 
 } // namespace
 
-Result Transfer(s64 size, const ReadCallback& rfunc, const WriteCallback& wfunc, Mode mode) {
-    return TransferInternal(size, rfunc, wfunc, mode);
+Result Transfer(s64 size, const ReadCallback& rfunc, const WriteCallback& wfunc, u64 buffer_size, Mode mode) {
+    return TransferInternal(size, rfunc, wfunc, buffer_size, mode);
 }
 
 } // namespace::thread

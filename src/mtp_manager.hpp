@@ -37,30 +37,28 @@ public:
     // 空间信息
     Result GetTotalSpace(const char *path, s64 *out) override;
     Result GetFreeSpace(const char *path, s64 *out) override;
-    Result GetEntryType(const char *path, FsDirEntryType *out_entry_type) override;
+    Result GetEntryType(const char *path, haze::FileAttrType *out_entry_type) override;
+    Result GetEntryAttributes(const char *path, haze::FileAttr *out) override;
 
     // 文件操作
-    Result CreateFile(const char* path, s64 size, u32 option) override;
+    Result CreateFile(const char* path, s64 size) override;
     Result DeleteFile(const char* path) override;
     Result RenameFile(const char *old_path, const char *new_path) override;
-    Result OpenFile(const char *path, u32 mode, FsFile *out_file) override;
-    Result GetFileSize(FsFile *file, s64 *out_size) override;
-    Result SetFileSize(FsFile *file, s64 size) override;
-    Result ReadFile(FsFile *file, s64 off, void *buf, u64 read_size, u32 option, u64 *out_bytes_read) override;
-    Result WriteFile(FsFile *file, s64 off, const void *buf, u64 write_size, u32 option) override;
-    void CloseFile(FsFile *file) override;
+    Result OpenFile(const char *path, haze::FileOpenMode mode, haze::File *out_file) override;
+    Result GetFileSize(haze::File *file, s64 *out_size) override;
+    Result SetFileSize(haze::File *file, s64 size) override;
+    Result ReadFile(haze::File *file, s64 off, void *buf, u64 read_size, u64 *out_bytes_read) override;
+    Result WriteFile(haze::File *file, s64 off, const void *buf, u64 write_size) override;
+    void CloseFile(haze::File *file) override;
 
     // 目录操作
     Result CreateDirectory(const char* path) override;
     Result DeleteDirectoryRecursively(const char* path) override;
     Result RenameDirectory(const char *old_path, const char *new_path) override;
-    Result OpenDirectory(const char *path, u32 mode, FsDir *out_dir) override;
-    Result ReadDirectory(FsDir *d, s64 *out_total_entries, size_t max_entries, FsDirectoryEntry *buf) override;
-    Result GetDirectoryEntryCount(FsDir *d, s64 *out_count) override;
-    void CloseDirectory(FsDir *d) override;
-
-    // 多线程传输支持
-    bool MultiThreadTransfer(s64 size, bool read) override;
+    Result OpenDirectory(const char *path, haze::Dir *out_dir) override;
+    Result ReadDirectory(haze::Dir *d, s64 *out_total_entries, size_t max_entries, haze::DirEntry *buf) override;
+    Result GetDirectoryEntryCount(haze::Dir *d, s64 *out_count) override;
+    void CloseDirectory(haze::Dir *d) override;
 
 private:
     FsFileSystem* m_fs;     // 文件系统指针
@@ -81,30 +79,28 @@ public:
     // 空间信息
     Result GetTotalSpace(const char *path, s64 *out) override;
     Result GetFreeSpace(const char *path, s64 *out) override;
-    Result GetEntryType(const char *path, FsDirEntryType *out_entry_type) override;
+    Result GetEntryType(const char *path, haze::FileAttrType *out_entry_type) override;
+    Result GetEntryAttributes(const char *path, haze::FileAttr *out) override;
     
     // 文件操作
-    Result CreateFile(const char* path, s64 size, u32 option) override;
+    Result CreateFile(const char* path, s64 size) override;
     Result DeleteFile(const char* path) override;
     Result RenameFile(const char *old_path, const char *new_path) override;
-    Result OpenFile(const char *path, u32 mode, FsFile *out_file) override;
-    Result GetFileSize(FsFile *file, s64 *out_size) override;
-    Result SetFileSize(FsFile *file, s64 size) override;
-    Result ReadFile(FsFile *file, s64 off, void *buf, u64 read_size, u32 option, u64 *out_bytes_read) override;
-    Result WriteFile(FsFile *file, s64 off, const void *buf, u64 write_size, u32 option) override;
-    void CloseFile(FsFile *file) override;
+    Result OpenFile(const char *path, haze::FileOpenMode mode, haze::File *out_file) override;
+    Result GetFileSize(haze::File *file, s64 *out_size) override;
+    Result SetFileSize(haze::File *file, s64 size) override;
+    Result ReadFile(haze::File *file, s64 off, void *buf, u64 read_size, u64 *out_bytes_read) override;
+    Result WriteFile(haze::File *file, s64 off, const void *buf, u64 write_size) override;
+    void CloseFile(haze::File *file) override;
     
     // 目录操作
     Result CreateDirectory(const char* path) override;
     Result DeleteDirectoryRecursively(const char* path) override;
     Result RenameDirectory(const char *old_path, const char *new_path) override;
-    Result OpenDirectory(const char *path, u32 mode, FsDir *out_dir) override;
-    Result ReadDirectory(FsDir *d, s64 *out_total_entries, size_t max_entries, FsDirectoryEntry *buf) override;
-    Result GetDirectoryEntryCount(FsDir *d, s64 *out_count) override;
-    void CloseDirectory(FsDir *d) override;
-    
-    // 多线程传输支持
-    bool MultiThreadTransfer(s64 size, bool read) override;
+    Result OpenDirectory(const char *path, haze::Dir *out_dir) override;
+    Result ReadDirectory(haze::Dir *d, s64 *out_total_entries, size_t max_entries, haze::DirEntry *buf) override;
+    Result GetDirectoryEntryCount(haze::Dir *d, s64 *out_count) override;
+    void CloseDirectory(haze::Dir *d) override;
 
 private:
     FsFileSystem* m_fs;         // 文件系统指针
@@ -125,30 +121,28 @@ public:
     // 空间信息
     Result GetTotalSpace(const char *path, s64 *out) override;
     Result GetFreeSpace(const char *path, s64 *out) override;
-    Result GetEntryType(const char *path, FsDirEntryType *out_entry_type) override;
+    Result GetEntryType(const char *path, haze::FileAttrType *out_entry_type) override;
+    Result GetEntryAttributes(const char *path, haze::FileAttr *out) override;
     
     // 文件操作
-    Result CreateFile(const char* path, s64 size, u32 option) override;
+    Result CreateFile(const char* path, s64 size) override;
     Result DeleteFile(const char* path) override;
     Result RenameFile(const char *old_path, const char *new_path) override;
-    Result OpenFile(const char *path, u32 mode, FsFile *out_file) override;
-    Result GetFileSize(FsFile *file, s64 *out_size) override;
-    Result SetFileSize(FsFile *file, s64 size) override;
-    Result ReadFile(FsFile *file, s64 off, void *buf, u64 read_size, u32 option, u64 *out_bytes_read) override;
-    Result WriteFile(FsFile *file, s64 off, const void *buf, u64 write_size, u32 option) override;
-    void CloseFile(FsFile *file) override;
+    Result OpenFile(const char *path, haze::FileOpenMode mode, haze::File *out_file) override;
+    Result GetFileSize(haze::File *file, s64 *out_size) override;
+    Result SetFileSize(haze::File *file, s64 size) override;
+    Result ReadFile(haze::File *file, s64 off, void *buf, u64 read_size, u64 *out_bytes_read) override;
+    Result WriteFile(haze::File *file, s64 off, const void *buf, u64 write_size) override;
+    void CloseFile(haze::File *file) override;
     
     // 目录操作
     Result CreateDirectory(const char* path) override;
     Result DeleteDirectoryRecursively(const char* path) override;
     Result RenameDirectory(const char *old_path, const char *new_path) override;
-    Result OpenDirectory(const char *path, u32 mode, FsDir *out_dir) override;
-    Result ReadDirectory(FsDir *d, s64 *out_total_entries, size_t max_entries, FsDirectoryEntry *buf) override;
-    Result GetDirectoryEntryCount(FsDir *d, s64 *out_count) override;
-    void CloseDirectory(FsDir *d) override;
-    
-    // 多线程传输支持
-    bool MultiThreadTransfer(s64 size, bool read) override;
+    Result OpenDirectory(const char *path, haze::Dir *out_dir) override;
+    Result ReadDirectory(haze::Dir *d, s64 *out_total_entries, size_t max_entries, haze::DirEntry *buf) override;
+    Result GetDirectoryEntryCount(haze::Dir *d, s64 *out_count) override;
+    void CloseDirectory(haze::Dir *d) override;
 
 private:
     FsFileSystem* m_fs;         // 文件系统指针

@@ -29,7 +29,7 @@ namespace haze {
 
     struct FsEntry {
         u32 storage_id;
-        std::shared_ptr<FileSystemProxyImpl> impl;
+        FileSystemProxy impl;
     };
 
     struct ObjectPropList {
@@ -63,7 +63,7 @@ namespace haze {
                 });
 
                 // this will never fail, so we unconditionally return.
-                return *(it->impl.get());
+                return it->impl;
             }
 
             auto& Fs(const PtpObject* obj) {
@@ -109,6 +109,8 @@ namespace haze {
             void WriteCallbackFile(CallbackType type, const char* name);
             void WriteCallbackRename(CallbackType type, const char* name, const char* newname);
             void WriteCallbackProgress(CallbackType type, s64 offset, s64 size);
+
+            static const char* BuildTimeStamp(char* out, u64 timestamp);
     };
 
 }

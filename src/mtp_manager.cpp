@@ -72,12 +72,63 @@ Result SdCardFileSystemProxy::GetFreeSpace(const char *path, s64 *out) {
     return fsFsGetFreeSpace(m_fs, FixPath(path), out);
 }
 
-Result SdCardFileSystemProxy::GetEntryType(const char *path, FsDirEntryType *out_entry_type) {
-    return fsFsGetEntryType(m_fs, FixPath(path), out_entry_type);
+Result SdCardFileSystemProxy::GetEntryType(const char *path, haze::FileAttrType *out_entry_type) {
+    FsDirEntryType type;
+    Result rc = fsFsGetEntryType(m_fs, FixPath(path), &type);
+    if (R_SUCCEEDED(rc)) {
+        *out_entry_type = (type == FsDirEntryType_Dir) ? haze::FileAttrType_DIR : haze::FileAttrType_FILE;
+    }
+    return rc;
 }
 
-Result SdCardFileSystemProxy::CreateFile(const char* path, s64 size, u32 option) {
-    return fsFsCreateFile(m_fs, FixPath(path), size, option);
+Result SdCardFileSystemProxy::GetEntryAttributes(const char *path, haze::FileAttr *out) {
+    // 获取文件类型
+    FsDirEntryType type;
+    Result rc = fsFsGetEntryType(m_fs, FixPath(path), &type);
+    if (R_FAILED(rc)) {
+        return rc;
+    }
+
+    if (type == FsDirEntryType_File) {
+        out->type = haze::FileAttrType_FILE;
+
+        // 获取时间戳（如果失败也不影响）
+        FsTimeStampRaw timestamp{};
+        if (R_SUCCEEDED(fsFsGetFileTimeStampRaw(m_fs, FixPath(path), &timestamp)) && timestamp.is_valid) {
+            out->ctime = timestamp.created;
+            out->mtime = timestamp.modified;
+        }
+
+        // 获取文件大小
+        FsFile file;
+        rc = fsFsOpenFile(m_fs, FixPath(path), FsOpenMode_Read, &file);
+        if (R_SUCCEEDED(rc)) {
+            s64 size;
+            if (R_SUCCEEDED(fsFileGetSize(&file, &size))) {
+                out->size = size;
+            }
+            fsFileClose(&file);
+        }
+    } else {
+        out->type = haze::FileAttrType_DIR;
+    }
+
+    // 设置只读标志（如果需要）
+    out->flag = 0;  // 默认可读写
+
+    return 0;  // 成功
+}
+
+Result SdCardFileSystemProxy::CreateFile(const char* path, s64 size) {
+    u32 flags = 0;
+    const s64 _4_GB = 0x100000000;
+    if (size >= _4_GB) {
+        flags = FsCreateOption_BigFile;
+    }
+
+    // 参考libhaze示例：不在这里设置大小，避免长时间阻塞导致超时
+    // SEE: https://github.com/ITotalJustice/libhaze/issues/1#issuecomment-3305067733
+    return fsFsCreateFile(m_fs, FixPath(path), 0, flags);
 }
 
 Result SdCardFileSystemProxy::DeleteFile(const char* path) {
@@ -89,66 +140,56 @@ Result SdCardFileSystemProxy::RenameFile(const char *old_path, const char *new_p
     return fsFsRenameFile(m_fs, FixPath(old_path, fixed_old), FixPath(new_path, fixed_new));
 }
 
-Result SdCardFileSystemProxy::OpenFile(const char *path, u32 mode, FsFile *out_file) {
-    return fsFsOpenFile(m_fs, FixPath(path), mode, out_file);
+Result SdCardFileSystemProxy::OpenFile(const char *path, haze::FileOpenMode mode, haze::File *out_file) {
+    u32 flags = FsOpenMode_Read;
+    if (mode == haze::FileOpenMode_WRITE) {
+        flags = FsOpenMode_Write | FsOpenMode_Append;
+    }
+
+    auto f = new FsFile();
+    const auto rc = fsFsOpenFile(m_fs, FixPath(path), flags, f);
+    if (R_FAILED(rc)) {
+        delete f;
+        return rc;
+    }
+
+    out_file->impl = f;
+    return 0;  // 成功
 }
 
-Result SdCardFileSystemProxy::GetFileSize(FsFile *file, s64 *out_size) {
-    return fsFileGetSize(file, out_size);
+Result SdCardFileSystemProxy::GetFileSize(haze::File *file, s64 *out_size) {
+    auto f = static_cast<FsFile*>(file->impl);
+    return fsFileGetSize(f, out_size);
 }
 
-Result SdCardFileSystemProxy::SetFileSize(FsFile *file, s64 size) {
-    return fsFileSetSize(file, size);
+Result SdCardFileSystemProxy::SetFileSize(haze::File *file, s64 size) {
+    // 参考libhaze示例：设置为0如果Switch在分配大文件时冻结
+    // 这通常发生在使用emuMMC + Windows时
+    #if 0
+    auto f = static_cast<FsFile*>(file->impl);
+    return fsFileSetSize(f, size);
+    #else
+    return 0;  // 成功，但不实际设置大小
+    #endif
 }
 
-Result SdCardFileSystemProxy::ReadFile(FsFile *file, s64 off, void *buf, u64 read_size, u32 option, u64 *out_bytes_read) {
-    return fsFileRead(file, off, buf, read_size, option, out_bytes_read);
+Result SdCardFileSystemProxy::ReadFile(haze::File *file, s64 off, void *buf, u64 read_size, u64 *out_bytes_read) {
+    auto f = static_cast<FsFile*>(file->impl);
+    return fsFileRead(f, off, buf, read_size, FsReadOption_None, out_bytes_read);
 }
 
-Result SdCardFileSystemProxy::WriteFile(FsFile *file, s64 off, const void *buf, u64 write_size, u32 option) {
-    // 临时注释掉分块写入机制，改为直接写入来测试重复传输大文件是否卡死
-    // Temporarily comment out chunked writing mechanism, use direct write to test repeated large file transfer freeze
-    
-    // 直接写入，不进行分块处理 / Direct write without chunking
-    return fsFileWrite(file, off, buf, write_size, option);
-    
-    
-    // // 原分块写入代码 / Original chunked writing code
-    // const u64 CHUNK_SIZE = 1*1024 * 1024; // 1MB分块大小，减少Switch Lite的调用次数限制 / 1MB chunk size to reduce call count limit on Switch Lite
-    // const u8* data_ptr = static_cast<const u8*>(buf);
-    // u64 remaining = write_size;
-    // s64 current_offset = off;
-    // Result result = 0;
-    
-    // // 如果写入大小小于分块大小，直接写入
-    // // If write size is smaller than chunk size, write directly
-    // if (write_size <= CHUNK_SIZE) {
-    //     result = fsFileWrite(file, off, buf, write_size, option);
-    //     return result;
-    // }
-    
-    // // 分块写入大文件 / Write large file in chunks
-    // while (remaining > 0) {
-    //     u64 current_chunk_size = (remaining > CHUNK_SIZE) ? CHUNK_SIZE : remaining;
-        
-    //     // 写入当前分块 / Write current chunk
-    //     result = fsFileWrite(file, current_offset, data_ptr, current_chunk_size, option);
-    //     if (R_FAILED(result)) {
-    //         return result; // 写入失败，返回错误 / Write failed, return error
-    //     }
-        
-    //     // 更新指针和偏移 / Update pointer and offset
-    //     data_ptr += current_chunk_size;
-    //     current_offset += current_chunk_size;
-    //     remaining -= current_chunk_size;
-    // }
-    
-    // return result;
-    
+Result SdCardFileSystemProxy::WriteFile(haze::File *file, s64 off, const void *buf, u64 write_size) {
+    auto f = static_cast<FsFile*>(file->impl);
+    return fsFileWrite(f, off, buf, write_size, FsWriteOption_None);
 }
 
-void SdCardFileSystemProxy::CloseFile(FsFile *file) {
-    fsFileClose(file);
+void SdCardFileSystemProxy::CloseFile(haze::File *file) {
+    auto f = static_cast<FsFile*>(file->impl);
+    if (f) {
+        fsFileClose(f);
+        delete f;
+        file->impl = nullptr;
+    }
 }
 
 Result SdCardFileSystemProxy::CreateDirectory(const char* path) {
@@ -164,25 +205,44 @@ Result SdCardFileSystemProxy::RenameDirectory(const char *old_path, const char *
     return fsFsRenameDirectory(m_fs, FixPath(old_path, fixed_old), FixPath(new_path, fixed_new));
 }
 
-Result SdCardFileSystemProxy::OpenDirectory(const char *path, u32 mode, FsDir *out_dir) {
-    return fsFsOpenDirectory(m_fs, FixPath(path), mode, out_dir);
+Result SdCardFileSystemProxy::OpenDirectory(const char *path, haze::Dir *out_dir) {
+    auto dir = new FsDir();
+    const auto rc = fsFsOpenDirectory(m_fs, FixPath(path), FsDirOpenMode_ReadDirs | FsDirOpenMode_ReadFiles | FsDirOpenMode_NoFileSize, dir);
+    if (R_FAILED(rc)) {
+        delete dir;
+        return rc;
+    }
+
+    out_dir->impl = dir;
+    return 0;  // 成功
 }
 
-Result SdCardFileSystemProxy::ReadDirectory(FsDir *d, s64 *out_total_entries, size_t max_entries, FsDirectoryEntry *buf) {
-    return fsDirRead(d, out_total_entries, max_entries, buf);
+Result SdCardFileSystemProxy::ReadDirectory(haze::Dir *d, s64 *out_total_entries, size_t max_entries, haze::DirEntry *buf) {
+    auto dir = static_cast<FsDir*>(d->impl);
+
+    std::vector<FsDirectoryEntry> entries(max_entries);
+    Result rc = fsDirRead(dir, out_total_entries, entries.size(), entries.data());
+    if (R_SUCCEEDED(rc)) {
+        for (s64 i = 0; i < *out_total_entries; i++) {
+            std::strcpy(buf[i].name, entries[i].name);
+        }
+    }
+
+    return rc;
 }
 
-Result SdCardFileSystemProxy::GetDirectoryEntryCount(FsDir *d, s64 *out_count) {
-    return fsDirGetEntryCount(d, out_count);
+Result SdCardFileSystemProxy::GetDirectoryEntryCount(haze::Dir *d, s64 *out_count) {
+    auto dir = static_cast<FsDir*>(d->impl);
+    return fsDirGetEntryCount(dir, out_count);
 }
 
-void SdCardFileSystemProxy::CloseDirectory(FsDir *d) {
-    fsDirClose(d);
-}
-
-bool SdCardFileSystemProxy::MultiThreadTransfer(s64 size, bool read) {
-    
-    return true;
+void SdCardFileSystemProxy::CloseDirectory(haze::Dir *d) {
+    auto dir = static_cast<FsDir*>(d->impl);
+    if (dir) {
+        fsDirClose(dir);
+        delete dir;
+        d->impl = nullptr;
+    }
 }
 
 //=============================================================================
@@ -195,7 +255,7 @@ AddModProxy::AddModProxy() {
 }
 
 const char* AddModProxy::GetName() const {
-    return "mods2/0000-add-mod-0000/";  // 挂载路径
+    return "add-mod:/";  // 挂载路径标识
 }
 
 const char* AddModProxy::GetDisplayName() const {
@@ -203,7 +263,7 @@ const char* AddModProxy::GetDisplayName() const {
 }
 
 const char* AddModProxy::FixPath(const char* path, char* out) const {
-    // 路径修正：参考SD卡代理的实现
+    // 路径修正：参考libhaze示例实现
     static char buf[FS_MAX_PATH];
     const auto len = std::strlen(GetName());
 
@@ -211,9 +271,9 @@ const char* AddModProxy::FixPath(const char* path, char* out) const {
         out = buf;
     }
 
-    // 先进行原有的路径处理逻辑
-    if (len && !strncasecmp(path + 1, GetName(), len)) {
-        std::snprintf(out, FS_MAX_PATH, "/mods2/0000-add-mod-0000%s", path + 1 + len);
+    // 按照libhaze示例的逻辑处理路径
+    if (len && !strncasecmp(path, GetName(), len)) {
+        std::snprintf(out, FS_MAX_PATH, "/mods2/0000-add-mod-0000/%s", path + len);
     } else {
         std::snprintf(out, FS_MAX_PATH, "/mods2/0000-add-mod-0000%s", path);
     }
@@ -239,15 +299,64 @@ Result AddModProxy::GetFreeSpace(const char *path, s64 *out) {
     return fsFsGetFreeSpace(m_fs, FixPath(path), out);
 }
 
-Result AddModProxy::GetEntryType(const char *path, FsDirEntryType *out_entry_type) {
-    return fsFsGetEntryType(m_fs, FixPath(path), out_entry_type);
+Result AddModProxy::GetEntryType(const char *path, haze::FileAttrType *out_entry_type) {
+    FsDirEntryType type;
+    Result rc = fsFsGetEntryType(m_fs, FixPath(path), &type);
+    if (R_SUCCEEDED(rc)) {
+        *out_entry_type = (type == FsDirEntryType_Dir) ? haze::FileAttrType_DIR : haze::FileAttrType_FILE;
+    }
+    return rc;
+}
+
+Result AddModProxy::GetEntryAttributes(const char *path, haze::FileAttr *out) {
+    // 获取文件类型
+    FsDirEntryType type;
+    Result rc = fsFsGetEntryType(m_fs, FixPath(path), &type);
+    if (R_FAILED(rc)) {
+        return rc;
+    }
+
+    if (type == FsDirEntryType_File) {
+        out->type = haze::FileAttrType_FILE;
+
+        // 获取时间戳（如果失败也不影响）
+        FsTimeStampRaw timestamp{};
+        if (R_SUCCEEDED(fsFsGetFileTimeStampRaw(m_fs, FixPath(path), &timestamp)) && timestamp.is_valid) {
+            out->ctime = timestamp.created;
+            out->mtime = timestamp.modified;
+        }
+
+        // 获取文件大小
+        FsFile file;
+        rc = fsFsOpenFile(m_fs, FixPath(path), FsOpenMode_Read, &file);
+        if (R_SUCCEEDED(rc)) {
+            s64 size;
+            if (R_SUCCEEDED(fsFileGetSize(&file, &size))) {
+                out->size = size;
+            }
+            fsFileClose(&file);
+        }
+    } else {
+        out->type = haze::FileAttrType_DIR;
+    }
+
+    // 设置只读标志（如果需要）
+    out->flag = 0;  // 默认可读写
+
+    return 0;  // 成功
 }
 
 // 文件操作
-Result AddModProxy::CreateFile(const char* path, s64 size, u32 option) {
-    // 参考项目策略：创建文件但不预分配大小，避免大文件创建时卡死
-    // Reference project strategy: create file without pre-allocation to avoid hanging on large files
-    return fsFsCreateFile(m_fs, FixPath(path), size, option);
+Result AddModProxy::CreateFile(const char* path, s64 size) {
+    u32 flags = 0;
+    const s64 _4_GB = 0x100000000;
+    if (size >= _4_GB) {
+        flags = FsCreateOption_BigFile;
+    }
+
+    // 参考libhaze示例：不在这里设置大小，避免长时间阻塞导致超时
+    // SEE: https://github.com/ITotalJustice/libhaze/issues/1#issuecomment-3305067733
+    return fsFsCreateFile(m_fs, FixPath(path), 0, flags);
 }
 
 Result AddModProxy::DeleteFile(const char* path) {
@@ -259,56 +368,57 @@ Result AddModProxy::RenameFile(const char *old_path, const char *new_path) {
     return fsFsRenameFile(m_fs, FixPath(old_path, fixed_old), FixPath(new_path, fixed_new));
 }
 
-Result AddModProxy::OpenFile(const char *path, u32 mode, FsFile *out_file) {
-    return fsFsOpenFile(m_fs, FixPath(path), mode, out_file);
+Result AddModProxy::OpenFile(const char *path, haze::FileOpenMode mode, haze::File *out_file) {
+    // 转换haze::FileOpenMode到FsOpenMode
+    u32 fs_mode = FsOpenMode_Read;
+    if (mode == haze::FileOpenMode_WRITE) {
+        fs_mode = FsOpenMode_Write | FsOpenMode_Append;
+    }
+
+    auto file = new FsFile();
+    const auto rc = fsFsOpenFile(m_fs, FixPath(path), fs_mode, file);
+    if (R_FAILED(rc)) {
+        delete file;
+        return rc;
+    }
+
+    out_file->impl = file;
+    return 0;  // 成功
 }
 
-Result AddModProxy::GetFileSize(FsFile *file, s64 *out_size) {
-    return fsFileGetSize(file, out_size);
+Result AddModProxy::GetFileSize(haze::File *file, s64 *out_size) {
+    auto f = static_cast<FsFile*>(file->impl);
+    return fsFileGetSize(f, out_size);
 }
 
-Result AddModProxy::SetFileSize(FsFile *file, s64 size) {
-    return fsFileSetSize(file, size);
+Result AddModProxy::SetFileSize(haze::File *file, s64 size) {
+    // 参考libhaze示例：设置为0如果Switch在分配大文件时冻结
+    // 这通常发生在使用emuMMC + Windows时
+    #if 0
+    auto f = static_cast<FsFile*>(file->impl);
+    return fsFileSetSize(f, size);
+    #else
+    return 0;  // 成功，但不实际设置大小
+    #endif
 }
 
-Result AddModProxy::ReadFile(FsFile *file, s64 off, void *buf, u64 read_size, u32 option, u64 *out_bytes_read) {
-    return fsFileRead(file, off, buf, read_size, option, out_bytes_read);
+Result AddModProxy::ReadFile(haze::File *file, s64 off, void *buf, u64 read_size, u64 *out_bytes_read) {
+    auto f = static_cast<FsFile*>(file->impl);
+    return fsFileRead(f, off, buf, read_size, FsReadOption_None, out_bytes_read);
 }
 
-Result AddModProxy::WriteFile(FsFile *file, s64 off, const void *buf, u64 write_size, u32 option) {
-    // 使用与SD卡代理相同的分块写入策略，避免大文件写入时卡死
-    // Use the same chunked write strategy as SD card proxy to avoid hanging on large files
-    // const u64 CHUNK_SIZE = 1024 * 1024; // 1MB 分块大小 / 1MB chunk size
-    
-    // Result result = 0;
-    // u64 remaining = write_size;
-    // s64 current_offset = off;
-    // const u8* data_ptr = static_cast<const u8*>(buf);
-    
-    // // 分块写入大文件 / Write large file in chunks
-    // while (remaining > 0) {
-    //     u64 current_chunk_size = (remaining > CHUNK_SIZE) ? CHUNK_SIZE : remaining;
-        
-    //     // 写入当前分块 / Write current chunk
-    //     result = fsFileWrite(file, current_offset, data_ptr, current_chunk_size, option);
-    //     if (R_FAILED(result)) {
-    //         return result; // 写入失败，返回错误 / Write failed, return error
-    //     }
-        
-    //     // 更新指针和偏移 / Update pointer and offset
-    //     data_ptr += current_chunk_size;
-    //     current_offset += current_chunk_size;
-    //     remaining -= current_chunk_size;
-    // }
-    
-    // return result;
-
-    // 直接写入，不进行分块处理 / Direct write without chunking
-    return fsFileWrite(file, off, buf, write_size, option);
+Result AddModProxy::WriteFile(haze::File *file, s64 off, const void *buf, u64 write_size) {
+    auto f = static_cast<FsFile*>(file->impl);
+    return fsFileWrite(f, off, buf, write_size, FsWriteOption_None);
 }
 
-void AddModProxy::CloseFile(FsFile *file) {
-    fsFileClose(file);
+void AddModProxy::CloseFile(haze::File *file) {
+    auto f = static_cast<FsFile*>(file->impl);
+    if (f) {
+        fsFileClose(f);
+        delete f;
+        file->impl = nullptr;
+    }
 }
 
 // 目录操作
@@ -325,24 +435,44 @@ Result AddModProxy::RenameDirectory(const char *old_path, const char *new_path) 
     return fsFsRenameDirectory(m_fs, FixPath(old_path, fixed_old), FixPath(new_path, fixed_new));
 }
 
-Result AddModProxy::OpenDirectory(const char *path, u32 mode, FsDir *out_dir) {
-    return fsFsOpenDirectory(m_fs, FixPath(path), mode, out_dir);
+Result AddModProxy::OpenDirectory(const char *path, haze::Dir *out_dir) {
+    auto dir = new FsDir();
+    const auto rc = fsFsOpenDirectory(m_fs, FixPath(path), FsDirOpenMode_ReadDirs | FsDirOpenMode_ReadFiles | FsDirOpenMode_NoFileSize, dir);
+    if (R_FAILED(rc)) {
+        delete dir;
+        return rc;
+    }
+
+    out_dir->impl = dir;
+    return 0;  // 成功
 }
 
-Result AddModProxy::ReadDirectory(FsDir *d, s64 *out_total_entries, size_t max_entries, FsDirectoryEntry *buf) {
-    return fsDirRead(d, out_total_entries, max_entries, buf);
+Result AddModProxy::ReadDirectory(haze::Dir *d, s64 *out_total_entries, size_t max_entries, haze::DirEntry *buf) {
+    auto dir = static_cast<FsDir*>(d->impl);
+
+    std::vector<FsDirectoryEntry> entries(max_entries);
+    Result rc = fsDirRead(dir, out_total_entries, entries.size(), entries.data());
+    if (R_SUCCEEDED(rc)) {
+        for (s64 i = 0; i < *out_total_entries; i++) {
+            std::strcpy(buf[i].name, entries[i].name);
+        }
+    }
+
+    return rc;
 }
 
-Result AddModProxy::GetDirectoryEntryCount(FsDir *d, s64 *out_count) {
-    return fsDirGetEntryCount(d, out_count);
+Result AddModProxy::GetDirectoryEntryCount(haze::Dir *d, s64 *out_count) {
+    auto dir = static_cast<FsDir*>(d->impl);
+    return fsDirGetEntryCount(dir, out_count);
 }
 
-void AddModProxy::CloseDirectory(FsDir *d) {
-    fsDirClose(d);
-}
-
-bool AddModProxy::MultiThreadTransfer(s64 size, bool read) {
-    return true;
+void AddModProxy::CloseDirectory(haze::Dir *d) {
+    auto dir = static_cast<FsDir*>(d->impl);
+    if (dir) {
+        fsDirClose(dir);
+        delete dir;
+        d->impl = nullptr;
+    }
 }
 
 //=============================================================================
@@ -355,7 +485,7 @@ NxModManagerProxy::NxModManagerProxy() {
 }
 
 const char* NxModManagerProxy::GetName() const {
-    return "mods2/";
+    return "nx-mod:/";
 }
 
 const char* NxModManagerProxy::GetDisplayName() const {
@@ -363,7 +493,7 @@ const char* NxModManagerProxy::GetDisplayName() const {
 }
 
 const char* NxModManagerProxy::FixPath(const char* path, char* out) const {
-    // 路径修正：参考SD卡代理的实现
+    // 路径修正：参考libhaze示例实现
     static char buf[FS_MAX_PATH];
     const auto len = std::strlen(GetName());
 
@@ -371,9 +501,9 @@ const char* NxModManagerProxy::FixPath(const char* path, char* out) const {
         out = buf;
     }
 
-    // 先进行原有的路径处理逻辑
-    if (len && !strncasecmp(path + 1, GetName(), len)) {
-        std::snprintf(out, FS_MAX_PATH, "/mods2%s", path + 1 + len);
+    // 按照libhaze示例的逻辑处理路径
+    if (len && !strncasecmp(path, GetName(), len)) {
+        std::snprintf(out, FS_MAX_PATH, "/mods2/%s", path + len);
     } else {
         std::snprintf(out, FS_MAX_PATH, "/mods2%s", path);
     }
@@ -399,15 +529,64 @@ Result NxModManagerProxy::GetFreeSpace(const char *path, s64 *out) {
     return fsFsGetFreeSpace(m_fs, FixPath(path), out);
 }
 
-Result NxModManagerProxy::GetEntryType(const char *path, FsDirEntryType *out_entry_type) {
-    return fsFsGetEntryType(m_fs, FixPath(path), out_entry_type);
+Result NxModManagerProxy::GetEntryType(const char *path, haze::FileAttrType *out_entry_type) {
+    FsDirEntryType type;
+    Result rc = fsFsGetEntryType(m_fs, FixPath(path), &type);
+    if (R_SUCCEEDED(rc)) {
+        *out_entry_type = (type == FsDirEntryType_Dir) ? haze::FileAttrType_DIR : haze::FileAttrType_FILE;
+    }
+    return rc;
+}
+
+Result NxModManagerProxy::GetEntryAttributes(const char *path, haze::FileAttr *out) {
+    // 获取文件类型
+    FsDirEntryType type;
+    Result rc = fsFsGetEntryType(m_fs, FixPath(path), &type);
+    if (R_FAILED(rc)) {
+        return rc;
+    }
+
+    if (type == FsDirEntryType_File) {
+        out->type = haze::FileAttrType_FILE;
+
+        // 获取时间戳（如果失败也不影响）
+        FsTimeStampRaw timestamp{};
+        if (R_SUCCEEDED(fsFsGetFileTimeStampRaw(m_fs, FixPath(path), &timestamp)) && timestamp.is_valid) {
+            out->ctime = timestamp.created;
+            out->mtime = timestamp.modified;
+        }
+
+        // 获取文件大小
+        FsFile file;
+        rc = fsFsOpenFile(m_fs, FixPath(path), FsOpenMode_Read, &file);
+        if (R_SUCCEEDED(rc)) {
+            s64 size;
+            if (R_SUCCEEDED(fsFileGetSize(&file, &size))) {
+                out->size = size;
+            }
+            fsFileClose(&file);
+        }
+    } else {
+        out->type = haze::FileAttrType_DIR;
+    }
+
+    // 设置只读标志（如果需要）
+    out->flag = 0;  // 默认可读写
+
+    return 0;  // 成功
 }
 
 // 文件操作
-Result NxModManagerProxy::CreateFile(const char* path, s64 size, u32 option) {
-    // 参考项目策略：创建文件但不预分配大小，避免大文件创建时卡死
-    // Reference project strategy: create file without pre-allocation to avoid hanging on large files
-    return fsFsCreateFile(m_fs, FixPath(path), size, option);
+Result NxModManagerProxy::CreateFile(const char* path, s64 size) {
+    u32 flags = 0;
+    const s64 _4_GB = 0x100000000;
+    if (size >= _4_GB) {
+        flags = FsCreateOption_BigFile;
+    }
+
+    // 参考libhaze示例：不在这里设置大小，避免长时间阻塞导致超时
+    // SEE: https://github.com/ITotalJustice/libhaze/issues/1#issuecomment-3305067733
+    return fsFsCreateFile(m_fs, FixPath(path), 0, flags);
 }
 
 Result NxModManagerProxy::DeleteFile(const char* path) {
@@ -419,56 +598,58 @@ Result NxModManagerProxy::RenameFile(const char *old_path, const char *new_path)
     return fsFsRenameFile(m_fs, FixPath(old_path, fixed_old), FixPath(new_path, fixed_new));
 }
 
-Result NxModManagerProxy::OpenFile(const char *path, u32 mode, FsFile *out_file) {
-    return fsFsOpenFile(m_fs, FixPath(path), mode, out_file);
+Result NxModManagerProxy::OpenFile(const char *path, haze::FileOpenMode mode, haze::File *out_file) {
+    // 转换haze::FileOpenMode到FsOpenMode
+    u32 fs_mode = FsOpenMode_Read;
+    if (mode == haze::FileOpenMode_WRITE) {
+        fs_mode = FsOpenMode_Write | FsOpenMode_Append;
+    }
+
+    auto file = new FsFile();
+    const auto rc = fsFsOpenFile(m_fs, FixPath(path), fs_mode, file);
+    if (R_FAILED(rc)) {
+        delete file;
+        return rc;
+    }
+
+    out_file->impl = file;
+    return 0;  // 成功
 }
 
-Result NxModManagerProxy::GetFileSize(FsFile *file, s64 *out_size) {
-    return fsFileGetSize(file, out_size);
+Result NxModManagerProxy::GetFileSize(haze::File *file, s64 *out_size) {
+    auto f = static_cast<FsFile*>(file->impl);
+    return fsFileGetSize(f, out_size);
 }
 
-Result NxModManagerProxy::SetFileSize(FsFile *file, s64 size) {
-    return fsFileSetSize(file, size);
+Result NxModManagerProxy::SetFileSize(haze::File *file, s64 size) {
+    // 参考libhaze示例：设置为0如果Switch在分配大文件时冻结
+    // 这通常发生在使用emuMMC + Windows时
+    #if 0
+    auto f = static_cast<FsFile*>(file->impl);
+    return fsFileSetSize(f, size);
+    #else
+    return 0;  // 成功，但不实际设置大小
+    #endif
 }
 
-Result NxModManagerProxy::ReadFile(FsFile *file, s64 off, void *buf, u64 read_size, u32 option, u64 *out_bytes_read) {
-    return fsFileRead(file, off, buf, read_size, option, out_bytes_read);
+Result NxModManagerProxy::ReadFile(haze::File *file, s64 off, void *buf, u64 read_size, u64 *out_bytes_read) {
+    auto f = static_cast<FsFile*>(file->impl);
+    return fsFileRead(f, off, buf, read_size, FsReadOption_None, out_bytes_read);
 }
 
-Result NxModManagerProxy::WriteFile(FsFile *file, s64 off, const void *buf, u64 write_size, u32 option) {
-    // 使用与SD卡代理相同的分块写入策略，避免大文件写入时卡死
-    // Use the same chunked write strategy as SD card proxy to avoid hanging on large files
-    // const u64 CHUNK_SIZE = 1024 * 1024; // 1MB 分块大小 / 1MB chunk size
+Result NxModManagerProxy::WriteFile(haze::File *file, s64 off, const void *buf, u64 write_size) {
+    auto f = static_cast<FsFile*>(file->impl);
     
-    // Result result = 0;
-    // u64 remaining = write_size;
-    // s64 current_offset = off;
-    // const u8* data_ptr = static_cast<const u8*>(buf);
-    
-    // // 分块写入大文件 / Write large file in chunks
-    // while (remaining > 0) {
-    //     u64 current_chunk_size = (remaining > CHUNK_SIZE) ? CHUNK_SIZE : remaining;
-        
-    //     // 写入当前分块 / Write current chunk
-    //     result = fsFileWrite(file, current_offset, data_ptr, current_chunk_size, option);
-    //     if (R_FAILED(result)) {
-    //         return result; // 写入失败，返回错误 / Write failed, return error
-    //     }
-        
-    //     // 更新指针和偏移 / Update pointer and offset
-    //     data_ptr += current_chunk_size;
-    //     current_offset += current_chunk_size;
-    //     remaining -= current_chunk_size;
-    // }
-    
-    // return result;
-
-    // 直接写入，不进行分块处理 / Direct write without chunking
-    return fsFileWrite(file, off, buf, write_size, option);
+    return fsFileWrite(f, off, buf, write_size, FsWriteOption_None);
 }
 
-void NxModManagerProxy::CloseFile(FsFile *file) {
-    fsFileClose(file);
+void NxModManagerProxy::CloseFile(haze::File *file) {
+    auto f = static_cast<FsFile*>(file->impl);
+    if (f) {
+        fsFileClose(f);
+        delete f;
+        file->impl = nullptr;
+    }
 }
 
 // 目录操作
@@ -485,24 +666,44 @@ Result NxModManagerProxy::RenameDirectory(const char *old_path, const char *new_
     return fsFsRenameDirectory(m_fs, FixPath(old_path, fixed_old), FixPath(new_path, fixed_new));
 }
 
-Result NxModManagerProxy::OpenDirectory(const char *path, u32 mode, FsDir *out_dir) {
-    return fsFsOpenDirectory(m_fs, FixPath(path), mode, out_dir);
+Result NxModManagerProxy::OpenDirectory(const char *path, haze::Dir *out_dir) {
+    auto dir = new FsDir();
+    const auto rc = fsFsOpenDirectory(m_fs, FixPath(path), FsDirOpenMode_ReadDirs | FsDirOpenMode_ReadFiles | FsDirOpenMode_NoFileSize, dir);
+    if (R_FAILED(rc)) {
+        delete dir;
+        return rc;
+    }
+
+    out_dir->impl = dir;
+    return 0;  // 成功
 }
 
-Result NxModManagerProxy::ReadDirectory(FsDir *d, s64 *out_total_entries, size_t max_entries, FsDirectoryEntry *buf) {
-    return fsDirRead(d, out_total_entries, max_entries, buf);
+Result NxModManagerProxy::ReadDirectory(haze::Dir *d, s64 *out_total_entries, size_t max_entries, haze::DirEntry *buf) {
+    auto dir = static_cast<FsDir*>(d->impl);
+
+    std::vector<FsDirectoryEntry> entries(max_entries);
+    Result rc = fsDirRead(dir, out_total_entries, entries.size(), entries.data());
+    if (R_SUCCEEDED(rc)) {
+        for (s64 i = 0; i < *out_total_entries; i++) {
+            std::strcpy(buf[i].name, entries[i].name);
+        }
+    }
+
+    return rc;
 }
 
-Result NxModManagerProxy::GetDirectoryEntryCount(FsDir *d, s64 *out_count) {
-    return fsDirGetEntryCount(d, out_count);
+Result NxModManagerProxy::GetDirectoryEntryCount(haze::Dir *d, s64 *out_count) {
+    auto dir = static_cast<FsDir*>(d->impl);
+    return fsDirGetEntryCount(dir, out_count);
 }
 
-void NxModManagerProxy::CloseDirectory(FsDir *d) {
-    fsDirClose(d);
-}
-
-bool NxModManagerProxy::MultiThreadTransfer(s64 size, bool read) {
-    return true;
+void NxModManagerProxy::CloseDirectory(haze::Dir *d) {
+    auto dir = static_cast<FsDir*>(d->impl);
+    if (dir) {
+        fsDirClose(dir);
+        delete dir;
+        d->impl = nullptr;
+    }
 }
 
 //=============================================================================
@@ -679,7 +880,7 @@ void MtpManager::UpdateTransferInfo(const haze::CallbackData* data) {
     
     switch (data->type) {
         case haze::CallbackType_ReadBegin:
-            // 开始读取文件 - 直接生成格式化状态文本，只显示文件名（不含路径）
+            // 读取开始，记录文件名并初始化速度计算
             {
                 const char* filename = data->file.filename;
                 const char* basename = strrchr(filename, '/');
@@ -698,11 +899,10 @@ void MtpManager::UpdateTransferInfo(const haze::CallbackData* data) {
             }
             m_just_completed = false;
             m_transfer_in_progress = true;  // 设置传输进行标志
-            // svcSleepThread(1000000);
             break;
             
         case haze::CallbackType_WriteBegin:
-            // 开始写入文件 - 直接生成格式化状态文本，只显示文件名（不含路径）
+            // 写入开始，记录文件名并初始化速度计算
             {
                 const char* filename = data->file.filename;
                 const char* basename = strrchr(filename, '/');
@@ -719,10 +919,8 @@ void MtpManager::UpdateTransferInfo(const haze::CallbackData* data) {
                 m_last_progress_offset = 0;
                 m_current_speed_mbps = 0.0;
             }
-            
             m_just_completed = false;
             m_transfer_in_progress = true;  // 设置传输进行标志
-            // svcSleepThread(1000000);
             break;
             
         case haze::CallbackType_ReadProgress:

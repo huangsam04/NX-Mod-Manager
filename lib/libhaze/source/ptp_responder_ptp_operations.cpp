@@ -61,7 +61,7 @@ namespace haze {
 
         /* Create the root storages. */
         for (const auto& fs : m_fs_entries) {
-            const auto name = fs.impl->GetName();
+            const auto name = fs.impl.GetName();
             const auto storage_id = fs.storage_id;
 
             PtpObject *object;
@@ -135,7 +135,13 @@ namespace haze {
         storage_info.max_capacity         = total_space;
         storage_info.free_space_in_bytes  = free_space;
         storage_info.free_space_in_images = 0;
-        storage_info.storage_description = it->impl->GetDisplayName();
+        storage_info.storage_description = it->impl.GetDisplayName();
+
+        if (it->impl.IsReadOnly()) {
+            // todo: support removeable devices.
+            storage_info.storage_type = PtpStorageType_FixedRom;
+            storage_info.access_capability = PtpAccessCapability_ReadOnly;
+        }
 
         /* Write the storage info data. */
         R_TRY(db.WriteVariableLengthData(m_request_header, [&] () {
@@ -183,8 +189,8 @@ namespace haze {
         log_write("Enumerating children of object %u (%s)\n", obj->GetObjectId(), obj->GetName());
 
         /* Try to read the object as a directory. */
-        FsDir dir;
-        R_TRY(Fs(obj).OpenDirectory(obj->GetName(), FsDirOpenMode_ReadDirs | FsDirOpenMode_ReadFiles, std::addressof(dir)));
+        Dir dir;
+        R_TRY(Fs(obj).OpenDirectory(obj->GetName(), std::addressof(dir)));
 
         /* Ensure we maintain a clean state on exit. */
         ON_SCOPE_EXIT { Fs(obj).CloseDirectory(std::addressof(dir)); };
@@ -253,34 +259,33 @@ namespace haze {
             /* The SD Card directory has some special properties. */
             object_info.object_format    = PtpObjectFormatCode_Association;
             object_info.association_type = PtpAssociationType_GenericFolder;
-            object_info.filename         = it->impl->GetDisplayName();
-        } else {
-            /* Figure out what type of object this is. */
-            FsDirEntryType entry_type;
-            R_TRY(Fs(obj).GetEntryType(obj->GetName(), std::addressof(entry_type)));
-
-            /* Get the size, if we are requesting info about a file. */
-            s64 size = 0;
-            if (entry_type == FsDirEntryType_File) {
-                FsFile file;
-                R_TRY(Fs(obj).OpenFile(obj->GetName(), FsOpenMode_Read, std::addressof(file)));
-
-                /* Ensure we maintain a clean state on exit. */
-                ON_SCOPE_EXIT { Fs(obj).CloseFile(std::addressof(file)); };
-
-                R_TRY(Fs(obj).GetFileSize(std::addressof(file), std::addressof(size)));
+            object_info.filename         = it->impl.GetDisplayName();
+            if (it->impl.IsReadOnly()) {
+                object_info.protection_status = PtpProtectionStatus_ReadOnly;
             }
+        } else {
+            /* Get the file attributes. */
+            FileAttr file_attr{};
+            R_TRY(Fs(obj).GetEntryAttributes(obj->GetName(), std::addressof(file_attr)));
 
             object_info.filename               = std::strrchr(obj->GetName(), '/') + 1;
-            object_info.object_compressed_size = size;
+            object_info.object_compressed_size = file_attr.size;
             object_info.parent_object          = obj->GetParentId();
 
-            if (entry_type == FsDirEntryType_Dir) {
+            if (file_attr.type == FileAttrType_DIR) {
                 object_info.object_format    = PtpObjectFormatCode_Association;
                 object_info.association_type = PtpAssociationType_GenericFolder;
             } else {
                 object_info.object_format    = PtpObjectFormatCode_Undefined;
                 object_info.association_type = PtpAssociationType_Undefined;
+            }
+
+            object_info.capture_date = BuildTimeStamp(m_buffers->capture_date_string_buffer, file_attr.ctime);
+            object_info.modification_date = BuildTimeStamp(m_buffers->modification_date_string_buffer, file_attr.mtime);
+
+            // note: mtp clients seem to ignore this and try and delete / write files anyway...
+            if (Fs(obj).IsReadOnly()) {
+                object_info.protection_status = PtpProtectionStatus_ReadOnly;
             }
         }
 
@@ -329,8 +334,8 @@ namespace haze {
         log_write("Sending object %u (%s)\n", object_id, obj->GetName());
 
         /* Lock the object as a file. */
-        FsFile file;
-        R_TRY(Fs(obj).OpenFile(obj->GetName(), FsOpenMode_Read, std::addressof(file)));
+        File file;
+        R_TRY(Fs(obj).OpenFile(obj->GetName(), FileOpenMode_READ, std::addressof(file)));
         log_write("Opened file %s\n", obj->GetName());
 
         /* Ensure we maintain a clean state on exit. */
@@ -347,16 +352,10 @@ namespace haze {
         WriteCallbackFile(CallbackType_ReadBegin, obj->GetName());
         ON_SCOPE_EXIT { WriteCallbackFile(CallbackType_ReadEnd, obj->GetName()); };
 
-        auto mode = sphaira::thread::Mode::MultiThreaded;
-        if (!Fs(obj).MultiThreadTransfer(file_size, true)) {
-            mode = sphaira::thread::Mode::SingleThreadedIfSmaller;
-        }
-
-        log_write("Using %s mode for transfer\n", mode == sphaira::thread::Mode::MultiThreaded ? "multi-threaded" : "single-threaded");
         R_TRY(sphaira::thread::Transfer(file_size,
             [this, &file, &obj](void* data, s64 off, s64 size, u64* bytes_read) -> Result {
                 /* Get the next batch. */
-                R_TRY(Fs(obj).ReadFile(std::addressof(file), off, data, size, FsReadOption_None, bytes_read));
+                R_TRY(Fs(obj).ReadFile(std::addressof(file), off, data, size, bytes_read));
                 R_SUCCEED();
             },
             [this, &db](const void* data, s64 off, s64 size) -> Result {
@@ -364,7 +363,7 @@ namespace haze {
                 R_TRY(db.AddBuffer((const u8*)data, size));
                 WriteCallbackProgress(CallbackType_ReadProgress, off, size);
                 R_SUCCEED();
-            }, mode
+            }, sphaira::thread::BUFFER_SIZE_READ, sphaira::thread::Mode::SingleThreadedIfSmaller
         ));
 
         /* Flush the data response. */
@@ -451,7 +450,7 @@ namespace haze {
             WriteCallbackFile(CallbackType_CreateFolder, obj->GetName());
             m_send_object_id = 0;
         } else {
-            R_TRY(Fs(obj).CreateFile(obj->GetName(), 0, 0));
+            R_TRY(Fs(obj).CreateFile(obj->GetName(), 0));
             WriteCallbackFile(CallbackType_CreateFile, obj->GetName());
             m_send_object_id = new_object_info.object_id;
         }
@@ -482,36 +481,36 @@ namespace haze {
         log_write("\n\n\nReceiving object %u (%s)\n", m_send_object_id, obj->GetName());
 
         /* Lock the object as a file. */
-        FsFile file;
-        R_TRY(Fs(obj).OpenFile(obj->GetName(), FsOpenMode_Write | FsOpenMode_Append, std::addressof(file)));
+        File file;
+        R_TRY(Fs(obj).OpenFile(obj->GetName(), FileOpenMode_WRITE, std::addressof(file)));
         log_write("Opened file %s\n", obj->GetName());
 
         /* Ensure we maintain a clean state on exit. */
         ON_SCOPE_EXIT { Fs(obj).CloseFile(std::addressof(file)); };
 
         /* Dummy file size for the threaded transfer. */
-        auto file_size = 4_GB;
+        u64 file_size = 4_GB;
+        u64 expected_file_size = 0;
         u64 offset = 0;
 
         if (m_send_prop_list) {
             file_size = m_send_prop_list->size;
+            expected_file_size = file_size;
             log_write("File size from property list: %ld\n", file_size);
         } else {
             if (data_header.length > sizeof(PtpUsbBulkContainer)) {
                 /* Got the real file size. */
                 file_size = data_header.length - sizeof(PtpUsbBulkContainer);
-                R_TRY(Fs(obj).SetFileSize(std::addressof(file), file_size));
+                expected_file_size = file_size;
                 log_write("File size from data header: %ld\n", file_size);
             } else {
-                /* Truncate the file after locking for write. */
-                R_TRY(Fs(obj).SetFileSize(std::addressof(file), 0));
                 log_write("File size unknown, starting at 0\n");
             }
         }
 
         /* Truncate the file to the received size. */
         ON_SCOPE_EXIT{
-            if (offset != file_size) {
+            if (offset < expected_file_size) {
                 Fs(obj).SetFileSize(std::addressof(file), offset);
             }
         };
@@ -519,14 +518,8 @@ namespace haze {
         WriteCallbackFile(CallbackType_WriteBegin, obj->GetName());
         ON_SCOPE_EXIT { WriteCallbackFile(CallbackType_WriteEnd, obj->GetName()); };
 
-        auto mode = sphaira::thread::Mode::MultiThreaded;
-        if (!Fs(obj).MultiThreadTransfer(0, false)) {
-            mode = sphaira::thread::Mode::SingleThreaded;
-        }
-
         bool is_done = false;
 
-        log_write("Using %s mode for transfer\n", mode == sphaira::thread::Mode::MultiThreaded ? "multi-threaded" : "single-threaded");
         R_TRY(sphaira::thread::Transfer(file_size,
             [this, &dp, &is_done](void* data, s64 off, s64 size, u64* bytes_read) -> Result {
                 if (is_done) {
@@ -549,18 +542,27 @@ namespace haze {
 
                 R_RETURN(read_res);
             },
-            [this, &file, &obj, &offset](const void* data, s64 off, s64 size) -> Result {
+            [this, &file, &obj, &offset, expected_file_size](const void* data, s64 off, s64 size) -> Result {
                 /* Write to the file. */
+                // during the first write, set the file size (if possible).
+                // the reason we do this here is so that we do not block for too long
+                // as windows will freeze if we take 3s+ between usb transfers.
+                if (!off && expected_file_size) {
+                    log_write("Setting file size to %ld\n", expected_file_size);
+                    R_TRY(Fs(obj).SetFileSize(std::addressof(file), expected_file_size));
+                }
+
                 log_write("Writing %ld bytes at offset %ld\n", size, off);
-                R_TRY(Fs(obj).WriteFile(std::addressof(file), off, data, size, 0));
+                R_TRY(Fs(obj).WriteFile(std::addressof(file), off, data, size));
                 log_write("Wrote %ld bytes at offset %ld\n", size, off);
                 WriteCallbackProgress(CallbackType_WriteProgress, off, size);
                 offset += size;
                 R_SUCCEED();
-            }, mode
+            }, sphaira::thread::BUFFER_SIZE_WRITE
         ));
 
         /* Write the success response. */
+        // note: it can timeout here if the final write takes too long.
         log_write("Received object %u (%s), total size %ld\n\n\n", m_send_object_id, obj->GetName(), offset);
         R_RETURN(this->WriteResponse(PtpResponseCode_Ok));
     }
@@ -584,11 +586,11 @@ namespace haze {
         log_write("Deleting object %u (%s)\n", object_id, obj->GetName());
 
         /* Figure out what type of object this is. */
-        FsDirEntryType entry_type;
+        FileAttrType entry_type;
         R_TRY(Fs(obj).GetEntryType(obj->GetName(), std::addressof(entry_type)));
 
         /* Remove the object from the filesystem. */
-        if (entry_type == FsDirEntryType_Dir) {
+        if (entry_type == FileAttrType_DIR) {
             WriteCallbackFile(CallbackType_DeleteFolder, obj->GetName());
             R_TRY(Fs(obj).DeleteDirectoryRecursively(obj->GetName()));
         } else {

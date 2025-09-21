@@ -29,8 +29,10 @@ namespace haze {
             u8 *m_data;
             bool m_eot;
         private:
-            Result Flush() {
+            Result Flush(u32 max_flush) {
                 R_UNLESS(!m_eot, haze::ResultEndOfTransmission());
+                max_flush = util::AlignUp(max_flush, 1_KB);
+                max_flush = std::clamp<u32>(max_flush, haze::UsbBulkSlowModePacketBufferSize, haze::UsbBulkPacketBufferSize);
 
                 m_received_size = 0;
                 m_offset = 0;
@@ -38,13 +40,13 @@ namespace haze {
                 ON_SCOPE_EXIT {
                     /* End of transmission occurs when receiving a bulk transfer less than the buffer size. */
                     /* PTP uses zero-length termination, so zero is a possible size to receive. */
-                    m_eot = m_received_size < haze::UsbBulkPacketBufferSize;
+                    m_eot = m_received_size < max_flush;
                     if (m_eot) {
                         log_write("End of transmission detected (received %u bytes)\n", m_received_size);
                     }
                 };
 
-                R_RETURN(m_server->ReadPacket(m_data, haze::UsbBulkPacketBufferSize, std::addressof(m_received_size)));
+                R_RETURN(m_server->ReadPacket(m_data, max_flush, std::addressof(m_received_size)));
             }
         public:
             constexpr explicit PtpDataParser(void *data, AsyncUsbServer *server) : m_server(server), m_received_size(), m_offset(), m_data(static_cast<u8 *>(data)), m_eot() { /* ... */ }
@@ -52,7 +54,7 @@ namespace haze {
             Result Finalize() {
                 /* Read until the transmission completes. */
                 while (true) {
-                    Result rc = this->Flush();
+                    Result rc = this->Flush(haze::UsbBulkPacketBufferSize);
 
                     R_SUCCEED_IF(m_eot || haze::ResultEndOfTransmission::Includes(rc));
                     R_TRY(rc);
@@ -66,7 +68,7 @@ namespace haze {
                     /* If we cannot read more bytes now, flush. */
                     if (m_offset == m_received_size) {
                         log_write("ReadBuffer: flushing to get more data: %u\n", count);
-                        R_TRY(this->Flush());
+                        R_TRY(this->Flush(count));
                         log_write("ReadBuffer: flushed, got %u bytes left: %u\n", m_received_size, count);
                     }
 
