@@ -4283,6 +4283,12 @@ App::~App() {
     
     // 清理音效管理器 (Cleanup audio manager)
     this->audio_manager.Cleanup();
+
+    // 强制关闭
+    if (copy_task.valid()) {
+        copy_task.request_stop();  // 尽量通知停止
+        copy_task = util::AsyncFurture<bool>{};  // 直接重置，丢弃原future
+    }
     
     // 检查异步线程是否有效，如果有效则停止并等待其完成
     if (this->async_thread.valid()) {
@@ -7057,7 +7063,7 @@ void App::newDrawDialogConfirm() {
     gfx::drawRoundedRect(this->vg, dialog_x, dialog_y, dialog_width, dialog_height, 6.0f, 45, 45, 45);
 
     // 绘制内容 (Draw content) - 使用drawTextBoxCentered在除按钮外的全部区域居中显示文本
-    gfx::drawTextBoxCentered(this->vg, dialog_x + 80.f, dialog_y + 40.f, dialog_width - 160.f, content_height - 80.f, 
+    gfx::drawTextBoxCentered(this->vg, dialog_x + 70.f, dialog_y + 40.f, dialog_width - 140.f, content_height - 80.f, 
                              this->newdialog_content_font_size, 1.4f, 
                              this->newdialog_content.c_str(), nullptr, 
                              this->newdialog_content_align, gfx::Colour::WHITE);
