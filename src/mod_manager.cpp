@@ -2450,6 +2450,7 @@ void ModManager::GetConflictingModNames(const std::string& mod_dir_path,const st
 
     // 代表检测到了冲突的MOD
     if (!mod_conflicting_name.empty()) {
+        mod_conflicting_name = mod_conflicting_name.substr(0, mod_conflicting_name.size() - 3);
         if (error_callback) {
             error_callback("冲突的MOD：" + mod_conflicting_name + "\n\n冲突的文件：" + contents_path);
         }
@@ -2458,7 +2459,7 @@ void ModManager::GetConflictingModNames(const std::string& mod_dir_path,const st
 
     // 所有mod中未找到冲突文件
     if (error_callback) {
-        error_callback("未检出冲突MOD，\n请按Y键清理当前mod后再尝试安装！");
+        error_callback("未检出冲突MOD，\n请按Y键清理当前mod后再尝试安装！\n\n冲突的文件：" + contents_path);
     }
 
 }
