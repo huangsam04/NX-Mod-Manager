@@ -50,7 +50,7 @@
 "CALCULATE_FILES": "Bestanden tellen...",
 "COPY_ERROR": "Fout tijdens installatie!",
 "UNINSTALLED_ERROR": "Fout tijdens verwijdering!",
-"CLEAR_BUTTON": "Opruimen overblijfselen",
+"CLEAR_BUTTON": "Opschonen",
 "FILE_NONE": "De structuur van het %s-module is onjuist, controleer dit!",
 "DNOT_READY": "Operatie te snel, niet klaar!",
 "ZIP_OPEN_ERROR": "Kan ZIP-bestand niet openen!\n",

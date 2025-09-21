@@ -50,7 +50,7 @@
 "CALCULATE_FILES": "正在统计文件数量...",
 "COPY_ERROR": "安装过程中发生错误！",
 "UNINSTALLED_ERROR": "删除文件失败！\n",
-"CLEAR_BUTTON": "卸载",
+"CLEAR_BUTTON": "清理",
 "FILE_NONE": "MOD结构不正确，安装失败！\n",
 "DNOT_READY": "操作的太快了，还没准备好！",
 "ZIP_OPEN_ERROR": "无法打开ZIP文件！ \n",

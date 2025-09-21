@@ -50,7 +50,7 @@
 "CALCULATE_FILES": "Counting files...",
 "COPY_ERROR": "Error during installation!",
 "UNINSTALLED_ERROR": "Error during uninstallation!",
-"CLEAR_BUTTON": "Clear residues",
+"CLEAR_BUTTON": "Clean",
 "FILE_NONE": "%s module structure is incorrect, please check!",
 "DNOT_READY": "Operation too fast, not ready yet!",
 "ZIP_OPEN_ERROR": "Unable to open ZIP file!\n",

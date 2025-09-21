@@ -50,7 +50,7 @@
 "CALCULATE_FILES": "Conteggio file in corso...",
 "COPY_ERROR": "Errore durante l'installazione!",
 "UNINSTALLED_ERROR": "Errore durante la disinstallazione!",
-"CLEAR_BUTTON": "Pulisci residui",
+"CLEAR_BUTTON": "Pulisci",
 "FILE_NONE": "La struttura del modulo %s non è corretta, controlla!",
 "DNOT_READY": "Operazione troppo veloce, non è ancora pronta!",
 "ZIP_OPEN_ERROR": "Impossibile aprire il file ZIP!\n",

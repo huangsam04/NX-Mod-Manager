@@ -50,7 +50,7 @@
 "CALCULATE_FILES": "ファイル数をカウント中...",
 "COPY_ERROR": "インストール中にエラーが発生しました！",
 "UNINSTALLED_ERROR": "アンインストール中にエラーが発生しました！",
-"CLEAR_BUTTON": "残り物を消去",
+"CLEAR_BUTTON": "クリーンアップ",
 "FILE_NONE": "%s モジュールの構造が不正です、確認してください！",
 "DNOT_READY": "操作がすぎて早すぎます、まだ準備ができていません！",
 "ZIP_OPEN_ERROR": "ZIPファイルを開くことができません!\n",

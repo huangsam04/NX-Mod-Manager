@@ -50,7 +50,7 @@
 "CALCULATE_FILES": "dateien zählen...",
 "COPY_ERROR": "fehler während der installation!",
 "UNINSTALLED_ERROR": "fehler während der deinstallation!",
-"CLEAR_BUTTON": "reste bereinigen",
+"CLEAR_BUTTON": "Bereinigen",
 "FILE_NONE": "%s-Modulstruktur ist ungültig, bitte überprüfen!",
 "DNOT_READY": "operation zu schnell, noch nicht bereit!",
 "ZIP_OPEN_ERROR": "zip-Datei kann nicht geöffnet werden!\n",

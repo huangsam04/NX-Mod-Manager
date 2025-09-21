@@ -50,7 +50,7 @@
 "CALCULATE_FILES": "Comptage des fichiers en cours...",
 "COPY_ERROR": "Erreur pendant l'installation!",
 "UNINSTALLED_ERROR": "Erreur pendant la désinstallation!",
-"CLEAR_BUTTON": "Nettoyer les résidus",
+"CLEAR_BUTTON": "Limpiar",
 "FILE_NONE": "La estructura del módulo %s es incorrecta, por favor revisa!",
 "DNOT_READY": "Operación demasiado rápida, no está lista aún!",
 "ZIP_OPEN_ERROR": "Impossible d'ouvrir le fichier ZIP!\n",

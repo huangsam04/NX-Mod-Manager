@@ -50,7 +50,7 @@
 "CALCULATE_FILES": "파일 개수 계산 중...",
 "COPY_ERROR": "설치 중 오류 발생!",
 "UNINSTALLED_ERROR": "제거 중 오류 발생!",
-"CLEAR_BUTTON": "잔여물 청소",
+"CLEAR_BUTTON": "정리",
 "FILE_NONE": "%s 모듈 구조가 올바르지 않습니다. 확인해 주세요!",
 "DNOT_READY": "작업이 너무 빨라서 아직 준비되지 않았습니다!",
 "ZIP_OPEN_ERROR": "ZIP 파일을 열 수 없습니다!\n",

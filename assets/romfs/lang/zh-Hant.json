@@ -50,7 +50,7 @@
 "CALCULATE_FILES": "正在統計文件數量...",
 "COPY_ERROR": "安裝過程中發生錯誤！",
 "UNINSTALLED_ERROR": "卸載過程中發生錯誤！",
-"CLEAR_BUTTON": "清殘",
+"CLEAR_BUTTON": "清理",
 "FILE_NONE": "%s模組結構不正確，請檢查！",
 "DNOT_READY": "操作的太快了，還沒準備好！",
 "ZIP_OPEN_ERROR": "無法打開ZIP文件！ \n",
