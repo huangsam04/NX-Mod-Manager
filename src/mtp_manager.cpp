@@ -725,6 +725,10 @@ MtpManager::MtpManager()
     , m_sd_proxy(nullptr)
     , m_addmod_proxy(nullptr)
     , m_nxmodmgr_proxy(nullptr)
+    , m_transfer_start_time_ns(0)
+    , m_last_progress_time_ns(0)
+    , m_last_progress_offset(0)
+    , m_current_speed_mbps(0.0)
     
 
 {
@@ -893,7 +897,8 @@ void MtpManager::UpdateTransferInfo(const haze::CallbackData* data) {
                 transfer_filename[sizeof(transfer_filename) - 1] = '\0'; // 确保字符串结束
                 
                 // 初始化速度计算变量
-                m_last_progress_time_ns = armGetSystemTick();
+                m_transfer_start_time_ns = armGetSystemTick();  // 记录传输开始时间
+                m_last_progress_time_ns = m_transfer_start_time_ns;
                 m_last_progress_offset = 0;
                 m_current_speed_mbps = 0.0;
             }
@@ -915,7 +920,8 @@ void MtpManager::UpdateTransferInfo(const haze::CallbackData* data) {
                 transfer_filename[sizeof(transfer_filename) - 1] = '\0'; // 确保字符串结束
                 
                 // 初始化速度计算变量
-                m_last_progress_time_ns = armGetSystemTick();
+                m_transfer_start_time_ns = armGetSystemTick();  // 记录传输开始时间
+                m_last_progress_time_ns = m_transfer_start_time_ns;
                 m_last_progress_offset = 0;
                 m_current_speed_mbps = 0.0;
             }
@@ -951,10 +957,17 @@ void MtpManager::UpdateTransferInfo(const haze::CallbackData* data) {
                     // 计算已读取大小
                     double progress_mb = (double)data->progress.offset / (1024.0 * 1024.0);
                     
+                    // 计算总耗时
+                    double total_elapsed_seconds = (double)(current_time_ns - m_transfer_start_time_ns) / 19200000.0;
+                    int minutes = (int)(total_elapsed_seconds / 60);
+                    int seconds = (int)(total_elapsed_seconds) % 60;
+                    char elapsed_time_str[16];
+                    snprintf(elapsed_time_str, sizeof(elapsed_time_str), "%02d:%02d", minutes, seconds);
+                    
                     char progress_text[256];
                     snprintf(progress_text, sizeof(progress_text), 
                         MTP_READING_PROGRESS_TAG.c_str(), 
-                        progress_mb, m_current_speed_mbps, transfer_filename);
+                        progress_mb, m_current_speed_mbps, elapsed_time_str);
                     m_transfer_status_text = std::string(progress_text);
                 }
             }
@@ -989,10 +1002,17 @@ void MtpManager::UpdateTransferInfo(const haze::CallbackData* data) {
                     // 计算已写入大小
                     double progress_mb = (double)data->progress.offset / (1024.0 * 1024.0);
                     
+                    // 计算总耗时
+                    double total_elapsed_seconds = (double)(current_time_ns - m_transfer_start_time_ns) / 19200000.0;
+                    int minutes = (int)(total_elapsed_seconds / 60);
+                    int seconds = (int)(total_elapsed_seconds) % 60;
+                    char elapsed_time_str[16];
+                    snprintf(elapsed_time_str, sizeof(elapsed_time_str), "%02d:%02d", minutes, seconds);
+                    
                     char progress_text[256];
                     snprintf(progress_text, sizeof(progress_text), 
                         MTP_WRITEING_PROGRESS_TAG.c_str(), 
-                        progress_mb, m_current_speed_mbps, transfer_filename);
+                        progress_mb, m_current_speed_mbps, elapsed_time_str);
                     m_transfer_status_text = std::string(progress_text);
                 }
             }

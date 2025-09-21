@@ -190,6 +190,7 @@ private:
     char transfer_filename[256];                             // 当前传输的文件名（用于Progress回调）
     
     // 速度计算相关变量（写入和读取共用）
+    u64 m_transfer_start_time_ns;                           // 传输开始时间（纳秒）
     u64 m_last_progress_time_ns;                            // 上次进度更新时间（纳秒）
     s64 m_last_progress_offset;                             // 上次进度的偏移量
     double m_current_speed_mbps;                            // 当前传输速度(MB/s)
