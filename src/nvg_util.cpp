@@ -162,6 +162,104 @@ void drawTextBox(NVGcontext* vg, float x, float y, float width, float size, floa
     nvgTextBox(vg, x, y, width, str, end);
 }
 
+// 字符级换行函数：按字符宽度换行，不考虑单词边界，但处理\n换行符 (Character-level line breaking: break by character width, ignore word boundaries, but handle \n newlines)
+static int breakTextByCharacter(NVGcontext* vg, const char* str, const char* end, float maxWidth, NVGtextRow* rows, int maxRows) {
+    if (!str || !rows || maxRows <= 0) return 0;
+    
+    int rowCount = 0;
+    const char* current = str;
+    const char* textEnd = end ? end : (str + strlen(str));
+    
+    while (current < textEnd && rowCount < maxRows) {
+        const char* lineStart = current;
+        const char* lineEnd = current;
+        float currentWidth = 0.0f;
+        bool foundNewline = false;
+        
+        // 逐字符检查，直到超过最大宽度或遇到\n (Check character by character until exceeding max width or encountering \n)
+        while (lineEnd < textEnd) {
+            // 检查是否遇到换行符 (Check if encountering newline character)
+            if (*lineEnd == '\n') {
+                foundNewline = true;
+                break;
+            }
+            
+            const char* nextChar = lineEnd;
+            
+            // 处理UTF-8字符，找到下一个字符的开始位置 (Handle UTF-8 characters, find next character start position)
+            if ((*nextChar & 0x80) == 0) {
+                // ASCII字符 (ASCII character)
+                nextChar++;
+            } else if ((*nextChar & 0xE0) == 0xC0) {
+                // 2字节UTF-8字符 (2-byte UTF-8 character)
+                nextChar += 2;
+            } else if ((*nextChar & 0xF0) == 0xE0) {
+                // 3字节UTF-8字符 (3-byte UTF-8 character)
+                nextChar += 3;
+            } else if ((*nextChar & 0xF8) == 0xF0) {
+                // 4字节UTF-8字符 (4-byte UTF-8 character)
+                nextChar += 4;
+            } else {
+                // 无效UTF-8，跳过 (Invalid UTF-8, skip)
+                nextChar++;
+            }
+            
+            // 确保不超过文本结尾 (Ensure not exceeding text end)
+            if (nextChar > textEnd) {
+                nextChar = textEnd;
+            }
+            
+            // 计算到这个字符为止的宽度 (Calculate width up to this character)
+            float testWidth = nvgTextBounds(vg, 0, 0, lineStart, nextChar, nullptr);
+            
+            if (testWidth > maxWidth && lineEnd > lineStart) {
+                // 超过宽度且已有字符，在当前位置断行 (Exceeds width and has characters, break at current position)
+                break;
+            }
+            
+            lineEnd = nextChar;
+            currentWidth = testWidth;
+        }
+        
+        // 如果遇到换行符，直接在换行符处断行 (If encountering newline, break directly at newline)
+        if (foundNewline) {
+            // 换行符处断行，计算当前行的宽度 (Break at newline, calculate current line width)
+            currentWidth = nvgTextBounds(vg, 0, 0, lineStart, lineEnd, nullptr);
+        } else if (lineEnd == lineStart && lineEnd < textEnd) {
+            // 如果一个字符都放不下，至少放一个字符 (If can't fit even one character, at least put one character)
+            // 强制包含至少一个字符 (Force include at least one character)
+            if ((*lineEnd & 0x80) == 0) {
+                lineEnd++;
+            } else if ((*lineEnd & 0xE0) == 0xC0) {
+                lineEnd += 2;
+            } else if ((*lineEnd & 0xF0) == 0xE0) {
+                lineEnd += 3;
+            } else if ((*lineEnd & 0xF8) == 0xF0) {
+                lineEnd += 4;
+            } else {
+                lineEnd++;
+            }
+            if (lineEnd > textEnd) lineEnd = textEnd;
+            currentWidth = nvgTextBounds(vg, 0, 0, lineStart, lineEnd, nullptr);
+        }
+        
+        // 保存这一行 (Save this line)
+        rows[rowCount].start = lineStart;
+        rows[rowCount].end = lineEnd;
+        // 如果遇到换行符，下一行从换行符之后开始 (If encountering newline, next line starts after newline)
+        rows[rowCount].next = foundNewline ? lineEnd + 1 : lineEnd;
+        rows[rowCount].width = currentWidth;
+        rows[rowCount].minx = 0;
+        rows[rowCount].maxx = currentWidth;
+        
+        rowCount++;
+        // 如果遇到换行符，跳过换行符继续处理 (If encountering newline, skip newline and continue)
+        current = foundNewline ? lineEnd + 1 : lineEnd;
+    }
+    
+    return rowCount;
+}
+
 void drawTextBoxCentered(NVGcontext* vg, float x, float y, float width, float height, float size, float lineSpacing, const char* str, const char* end, Colour c) {
     nvgFontSize(vg, size);
     nvgFillColor(vg, getColour(c));
@@ -175,23 +273,9 @@ void drawTextBoxCentered(NVGcontext* vg, float x, float y, float width, float he
     float textAreaWidth = width;
     float textAreaX = x;
     
-    // 计算自动换行后的文本行数 (Calculate text rows after auto line wrapping)
-    NVGtextRow rows[20];
-    int nrows = 0;
-    const char* s = str;
-    int totalRows = 0;
-    
-    // 收集所有文本行 (Collect all text rows)
+    // 使用字符级换行计算文本行数 (Use character-level line breaking to calculate text rows)
     NVGtextRow allRows[20];
-    int allRowsCount = 0;
-    
-    while ((nrows = nvgTextBreakLines(vg, s, end, textAreaWidth, rows, 20)) && allRowsCount < 20) {
-        for (int i = 0; i < nrows && allRowsCount < 20; i++) {
-            allRows[allRowsCount++] = rows[i];
-        }
-        s = rows[nrows-1].next;
-        if (s == nullptr || *s == '\0') break;
-    }
+    int allRowsCount = breakTextByCharacter(vg, str, end, textAreaWidth, allRows, 20);
     
     // 计算文本总高度 (Calculate total text height)
     float totalTextHeight = allRowsCount > 0 ? allRowsCount * lineSpacing * lineh : 0;
@@ -201,16 +285,31 @@ void drawTextBoxCentered(NVGcontext* vg, float x, float y, float width, float he
     // 考虑文本基线，使用ascender来正确计算起始位置 (Consider text baseline, use ascender to correctly calculate start position)
     float textStartY = centerY - totalTextHeight / 2.0f + ascender;
     
-    // 设置文本对齐方式为水平居中，垂直顶部对齐 (Set text alignment to horizontal center, vertical top)
-    nvgTextAlign(vg, NVG_ALIGN_CENTER | NVG_ALIGN_TOP);
+    // 水平居中但左对齐：计算文本块的实际宽度，让整个文本块居中，但内容左对齐 (Horizontal center but left-aligned: calculate actual text block width, center the block, but left-align content)
+    float maxLineWidth = 0.0f;
     
-    // 逐行绘制文本，每行都水平居中 (Draw text line by line, each line horizontally centered)
+    // 计算所有行中最宽的行宽度 (Calculate the width of the widest line)
+    for (int i = 0; i < allRowsCount; i++) {
+        float lineWidth = nvgTextBounds(vg, 0, 0, allRows[i].start, allRows[i].end, nullptr);
+        if (lineWidth > maxLineWidth) {
+            maxLineWidth = lineWidth;
+        }
+    }
+    
+    // 如果文本块宽度小于容器宽度，则让文本块在容器中居中 (If text block width is smaller than container width, center the text block in container)
+    float textBlockStartX = textAreaX;
+    if (maxLineWidth < textAreaWidth) {
+        textBlockStartX = textAreaX + (textAreaWidth - maxLineWidth) / 2.0f;
+    }
+    
+    // 设置文本对齐方式为左对齐 (Set text alignment to left)
+    nvgTextAlign(vg, NVG_ALIGN_LEFT | NVG_ALIGN_TOP);
+    
+    // 逐行绘制文本，每行都从文本块的起始位置开始（左对齐） (Draw text line by line, each line starts from text block start position (left-aligned))
     float currentY = textStartY;
-    float textAreaCenterX = textAreaX + textAreaWidth / 2.0f;
     
     for (int i = 0; i < allRowsCount; i++) {
-        // 为每行文本单独设置水平居中位置 (Set horizontal center position for each line)
-        nvgText(vg, textAreaCenterX, currentY, allRows[i].start, allRows[i].end);
+        nvgText(vg, textBlockStartX, currentY, allRows[i].start, allRows[i].end);
         currentY += lineSpacing * lineh;
     }
 }
@@ -229,22 +328,9 @@ void drawTextBoxCentered(NVGcontext* vg, float x, float y, float width, float he
     float textAreaWidth = width;
     float textAreaX = x;
     
-    // 计算自动换行后的文本行数 (Calculate text rows after auto line wrapping)
-    NVGtextRow rows[20];
-    int nrows = 0;
-    const char* s = str;
-    
-    // 收集所有文本行 (Collect all text rows)
+    // 使用字符级换行计算文本行数 (Use character-level line breaking to calculate text rows)
     NVGtextRow allRows[20];
-    int allRowsCount = 0;
-    
-    while ((nrows = nvgTextBreakLines(vg, s, end, textAreaWidth, rows, 20)) && allRowsCount < 20) {
-        for (int i = 0; i < nrows && allRowsCount < 20; i++) {
-            allRows[allRowsCount++] = rows[i];
-        }
-        s = rows[nrows-1].next;
-        if (s == nullptr || *s == '\0') break;
-    }
+    int allRowsCount = breakTextByCharacter(vg, str, end, textAreaWidth, allRows, 20);
     
     // 计算文本总高度 (Calculate total text height)
     float totalTextHeight = allRowsCount > 0 ? allRowsCount * lineSpacing * lineh : 0;
@@ -269,17 +355,41 @@ void drawTextBoxCentered(NVGcontext* vg, float x, float y, float width, float he
     }
     
     // 水平对齐处理 (Horizontal alignment handling)
-    if (align & NVG_ALIGN_LEFT) {
+    int finalAlign = align;
+    bool isCenterAligned = (align & (NVG_ALIGN_LEFT | NVG_ALIGN_CENTER | NVG_ALIGN_RIGHT)) == NVG_ALIGN_CENTER;
+    
+    if (isCenterAligned) {
+        // 水平居中但左对齐：计算文本块实际宽度，让整个文本块居中，但内容左对齐 (Horizontal center but left-aligned: calculate actual text block width, center the block, but left-align content)
+        float maxLineWidth = 0.0f;
+        
+        // 计算所有行中最宽的行宽度 (Calculate the width of the widest line)
+        for (int i = 0; i < allRowsCount; i++) {
+            float lineWidth = nvgTextBounds(vg, 0, 0, allRows[i].start, allRows[i].end, nullptr);
+            if (lineWidth > maxLineWidth) {
+                maxLineWidth = lineWidth;
+            }
+        }
+        
+        // 如果文本块宽度小于容器宽度，则让文本块在容器中居中 (If text block width is smaller than container width, center the text block in container)
+        if (maxLineWidth < textAreaWidth) {
+            textX = textAreaX + (textAreaWidth - maxLineWidth) / 2.0f;
+        } else {
+            textX = textAreaX;
+        }
+        
+        // 改为左对齐模式 (Change to left alignment mode)
+        finalAlign = (align & ~(NVG_ALIGN_LEFT | NVG_ALIGN_CENTER | NVG_ALIGN_RIGHT)) | NVG_ALIGN_LEFT;
+    } else if (align & NVG_ALIGN_LEFT) {
         textX = textAreaX;  // 左对齐 (Left alignment)
     } else if (align & NVG_ALIGN_RIGHT) {
         textX = textAreaX + textAreaWidth;  // 右对齐 (Right alignment)
     } else {
-        // 默认水平居中 (Default horizontal center)
-        textX = textAreaX + textAreaWidth / 2.0f;
+        // 其他情况默认左对齐 (Default to left alignment for other cases)
+        textX = textAreaX;
     }
     
     // 设置文本对齐方式 (Set text alignment)
-    nvgTextAlign(vg, align);
+    nvgTextAlign(vg, finalAlign);
     
     // 逐行绘制文本 (Draw text line by line)
     float currentY = textStartY;

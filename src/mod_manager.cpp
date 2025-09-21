@@ -2451,7 +2451,7 @@ void ModManager::GetConflictingModNames(const std::string& mod_dir_path,const st
     // 代表检测到了冲突的MOD
     if (!mod_conflicting_name.empty()) {
         if (error_callback) {
-            error_callback("冲突的MOD：" + mod_conflicting_name + "\n冲突的文件：" + contents_path);
+            error_callback("冲突的MOD：" + mod_conflicting_name + "\n\n冲突的文件：" + contents_path);
         }
         return;
     } 
