@@ -124,7 +124,7 @@
 "MTP_STOP_BUTTON": "Arrêter",
 "MTP_NOT_RUNNING_TEXT": "MTP non lancé, appuyez sur X pour démarrer",
 "MTP_NOUSB_RUNNING_TEXT": "MTP lancé, connectez avec câble USB",
-"MTP_NOT_RUNNING_REAL_TEXT": "MTP non lancé, appuyez sur X pour démarrer\n(Expérimental, redémarrez SWITCH en cas de plantage)",
+"MTP_NOT_RUNNING_REAL_TEXT": "MTP non lancé, appuyez sur X pour démarrer",
 "MTP_WRITEING_TAG": "[Écriture]",
 "MTP_READING_TAG": "[Lecture]",
 "MTP_CONFIRM_STOP_TEXT": "Transfert de fichier en cours, fermer MTP?",

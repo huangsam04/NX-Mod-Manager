@@ -124,7 +124,7 @@
 "MTP_STOP_BUTTON": "정지",
 "MTP_NOT_RUNNING_TEXT": "MTP 미실행, X 키로 시작",
 "MTP_NOUSB_RUNNING_TEXT": "MTP 실행 중, USB 케이블로 연결",
-"MTP_NOT_RUNNING_REAL_TEXT": "MTP 미실행, X 키로 시작\n(실험 기능, 멈춘 경우 SWITCH 재시작)",
+"MTP_NOT_RUNNING_REAL_TEXT": "MTP 미실행, X 키로 시작",
 "MTP_WRITEING_TAG": "[쓰는 중]",
 "MTP_READING_TAG": "[읽는 중]",
 "MTP_CONFIRM_STOP_TEXT": "파일 전송 중, MTP 닫기?",

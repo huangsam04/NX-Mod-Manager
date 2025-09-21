@@ -124,7 +124,7 @@
 "MTP_STOP_BUTTON" : "停止",
 "MTP_NOT_RUNNING_TEXT" : "MTP未開啟，請按X鍵啟動MTP",
 "MTP_NOUSB_RUNNING_TEXT" : "MTP已開啟，請用USB線連接電腦",
-"MTP_NOT_RUNNING_REAL_TEXT" : "MTP未開啟，請按X鍵啟動MTP\n（實驗功能，如果卡死了重啟SWITCH）",
+"MTP_NOT_RUNNING_REAL_TEXT" : "MTP未開啟，請按X鍵啟動MTP",
 "MTP_WRITEING_TAG" : "[正在寫入]",
 "MTP_READING_TAG" : "[正在讀取]",
 "MTP_CONFIRM_STOP_TEXT" : "正在傳輸檔案，是否確認關閉MTP？",

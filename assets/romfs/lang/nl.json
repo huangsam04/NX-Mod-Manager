@@ -124,7 +124,7 @@
 "MTP_STOP_BUTTON": "Stop",
 "MTP_NOT_RUNNING_TEXT": "MTP niet actief, druk X om te starten",
 "MTP_NOUSB_RUNNING_TEXT": "MTP actief, verbind met USB-kabel",
-"MTP_NOT_RUNNING_REAL_TEXT": "MTP niet actief, druk X om te starten\n(Experimenteel, start SWITCH opnieuw bij bevriezen)",
+"MTP_NOT_RUNNING_REAL_TEXT": "MTP niet actief, druk X om te starten",
 "MTP_WRITEING_TAG": "[Schrijven]",
 "MTP_READING_TAG": "[Lezen]",
 "MTP_CONFIRM_STOP_TEXT": "Bestandsoverdracht actief, MTP sluiten?",

@@ -124,7 +124,7 @@
 "MTP_STOP_BUTTON" : "Ferma",
 "MTP_NOT_RUNNING_TEXT" : "MTP non attivo, premi X per avviarlo",
 "MTP_NOUSB_RUNNING_TEXT" : "MTP attivo, connetti al computer via cavo USB",
-"MTP_NOT_RUNNING_REAL_TEXT" : "MTP non attivo, premi X per avviarlo\n(Funzione sperimentale, riavvia SWITCH se si blocca)",
+"MTP_NOT_RUNNING_REAL_TEXT" : "MTP non attivo, premi X per avviarlo",
 "MTP_WRITEING_TAG" : "[Scrittura in corso]",
 "MTP_READING_TAG" : "[Lettura in corso]",
 "MTP_CONFIRM_STOP_TEXT" : "Trasferimento file in corso, confermi la chiusura di MTP?",

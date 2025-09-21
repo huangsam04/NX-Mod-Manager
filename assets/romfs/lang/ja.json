@@ -124,7 +124,7 @@
 "MTP_STOP_BUTTON": "停止",
 "MTP_NOT_RUNNING_TEXT": "MTP未起動、Xキーで起動",
 "MTP_NOUSB_RUNNING_TEXT": "MTP起動中、USBケーブルで接続",
-"MTP_NOT_RUNNING_REAL_TEXT": "MTP未起動、Xキーで起動\n（実験機能、フリーズ時はSWITCH再起動）",
+"MTP_NOT_RUNNING_REAL_TEXT": "MTP未起動、Xキーで起動",
 "MTP_WRITEING_TAG": "[書き込み中]",
 "MTP_READING_TAG": "[読み込み中]",
 "MTP_CONFIRM_STOP_TEXT": "ファイル転送中、MTPを閉じますか？",

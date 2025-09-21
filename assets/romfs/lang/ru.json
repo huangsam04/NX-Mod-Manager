@@ -124,7 +124,7 @@
 "MTP_STOP_BUTTON" : "Остановить",
 "MTP_NOT_RUNNING_TEXT" : "MTP не запущен, нажмите X для запуска",
 "MTP_NOUSB_RUNNING_TEXT" : "MTP запущен, подключите к компьютеру через USB-кабель",
-"MTP_NOT_RUNNING_REAL_TEXT" : "MTP не запущен, нажмите X для запуска\n(Экспериментальная функция, перезагрузите SWITCH при зависании)",
+"MTP_NOT_RUNNING_REAL_TEXT" : "MTP не запущен, нажмите X для запуска",
 "MTP_WRITEING_TAG" : "[Запись]",
 "MTP_READING_TAG" : "[Чтение]",
 "MTP_CONFIRM_STOP_TEXT" : "Идет передача файлов, уверены, что хотите закрыть MTP?",

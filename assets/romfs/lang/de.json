@@ -124,7 +124,7 @@
 "MTP_STOP_BUTTON": "Stoppen",
 "MTP_NOT_RUNNING_TEXT": "MTP nicht aktiv, drücke X zum Starten",
 "MTP_NOUSB_RUNNING_TEXT": "MTP aktiv, verbinde mit USB-Kabel",
-"MTP_NOT_RUNNING_REAL_TEXT": "MTP nicht aktiv, drücke X zum Starten\n(Experimentell, starte SWITCH neu bei Freeze)",
+"MTP_NOT_RUNNING_REAL_TEXT": "MTP nicht aktiv, drücke X zum Starten",
 "MTP_WRITEING_TAG": "[Schreibe]",
 "MTP_READING_TAG": "[Lese]",
 "MTP_CONFIRM_STOP_TEXT": "Dateiübertragung läuft, MTP schließen?",
