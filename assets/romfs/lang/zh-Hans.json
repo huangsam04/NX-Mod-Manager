@@ -108,8 +108,8 @@
 "VERSION_ERROR_TEXT": "\n版本不一致！是否继续安装？",
 "CONFIRM_REMOVE_GAME": "确认移除当前游戏及其所有模组？",
 "CONFIRM_REMOVE_MOD": "确认移除当前模组？\n模组会移动到ADD-MOD目录。",
-"NON_ZIP_MOD_FOUND":"目录下存在非ZIP-MOD文件，请检查！\n",
-"MOVE_MOD_FAILED":"移动MOD失败，请检查！\n",
+"NON_ZIP_MOD_FOUND":"目录下存在非ZIP-MOD文件，请检查！\n\n",
+"MOVE_MOD_FAILED":"移动MOD失败，请检查！\n\n",
 "HAVE_UNINSTALLED_MOD":"存在未卸载MOD，无法移除改游戏！",
 "REMOVE_GAME_ERROR":"移除游戏报错！\n仅支持移除ZIP格式！\n失败MOD数量：",
 "SEARCH_TEXT": "搜索游戏",
@@ -119,8 +119,6 @@
 "RESULT_BUTTON":"结果",
 "KEYBOARD_BUTTON":"键盘",
 "PROMPT_SEARCH_TEXT":"支持触摸、拼音、首字母、模糊、多音字及全拼多种搜索方式",
-
-
 "MTP_TITLE_TEXT":"MTP传输（实验功能）",
 "MTP_START_BUTTON" : "启动",
 "MTP_STOP_BUTTON" : "停止",
