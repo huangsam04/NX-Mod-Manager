@@ -1537,9 +1537,16 @@ bool ModManager::copyFilesBatch(const std::vector<FileInfo>& file_info_list,
     const size_t BATCH_MEMORY_LIMIT = 32 * 1024 * 1024; // 32MB 批量内存限制
     
     
+    // 资源管理变量 (Resource management variables)
+    char* aligned_buffer = nullptr;
+    FILE* source_file = nullptr;
+    FILE* dest_file = nullptr;
+    bool is_error = false;
+    bool is_stopped = false;
+    
     // 分配块对齐缓冲区 (Allocate block-aligned buffers)
     // Switch平台使用memalign进行内存对齐到SD卡块边界
-    char* aligned_buffer = (char*)memalign(SD_BLOCK_SIZE, ALIGNED_BUFFER_SIZE + SD_BLOCK_SIZE);
+    aligned_buffer = (char*)memalign(SD_BLOCK_SIZE, ALIGNED_BUFFER_SIZE + SD_BLOCK_SIZE);
     
     if (!aligned_buffer) {
         if (error_callback) {
@@ -1561,7 +1568,7 @@ bool ModManager::copyFilesBatch(const std::vector<FileInfo>& file_info_list,
     
     
     
-    bool overall_success = true;
+    
     
     // 优化：单次遍历处理，小文件累积到内存池，大文件立即处理 (Optimization: single-pass processing, accumulate small files in memory pool, process large files immediately)
     std::vector<std::pair<std::string, std::vector<char>>> cached_files;
@@ -1572,16 +1579,18 @@ bool ModManager::copyFilesBatch(const std::vector<FileInfo>& file_info_list,
         for (const auto& cached : cached_files) {
             // 检查是否需要停止 (Check if stop is requested)
             if (stop_token.stop_requested()) {
-                return true; // 返回true以确保能进入清理逻辑 (Return true to ensure cleanup logic is executed)
+                is_stopped = true;
+                return false;
             }
             
-            FILE* dest_file = fopen(cached.first.c_str(), "wb");
+            dest_file = fopen(cached.first.c_str(), "wb");
             if (dest_file) {
                 // SD卡块对齐写入优化 (SD Card block-aligned write optimization)
                 setvbuf(dest_file, nullptr, _IOFBF, ALIGNED_BUFFER_SIZE);
                 
                 size_t written = fwrite(cached.second.data(), 1, cached.second.size(), dest_file);
                 fclose(dest_file);
+                dest_file = nullptr; // 立即重置文件句柄，确保所有分支都安全
                 
                 if (written == cached.second.size()) {
                     copied_files++;
@@ -1595,12 +1604,14 @@ bool ModManager::copyFilesBatch(const std::vector<FileInfo>& file_info_list,
                     if (error_callback) {
                         error_callback(CANT_WRITE_ERROR + cached.first);
                     }
+                    is_error = true;
                     return false;
                 }
             } else {
                 if (error_callback) {
                     error_callback(CANT_CREATE_DIR + cached.first);
                 }
+                is_error = true;
                 return false;
             }
         }
@@ -1615,10 +1626,8 @@ bool ModManager::copyFilesBatch(const std::vector<FileInfo>& file_info_list,
         copied_files_list.insert(copied_files_list.begin(), file_info.target_path);
         // 检查是否需要停止 (Check if stop is requested)
         if (stop_token.stop_requested()) {
-            free(aligned_buffer);
-            // 触发中断的清理函数
-            cleanupCopiedFilesAndDirectories(copied_files_list, progress_callback, total_files);
-            return false;
+            is_stopped = true;
+            goto cleanup;
         }
         
         if (file_info.file_size <= SMALL_FILE_THRESHOLD) {
@@ -1627,20 +1636,18 @@ bool ModManager::copyFilesBatch(const std::vector<FileInfo>& file_info_list,
              // 检查内存限制，如果超出则先写入已缓存的文件 (Check memory limit, flush cached files if exceeded)
              if (total_cached_size + file_info.file_size > BATCH_MEMORY_LIMIT) {
                  if (!flush_cached_files()) {
-                     free(aligned_buffer);
-                     return false;
+                     is_error = true;
+                     goto cleanup;
                  }
              }
              
-             FILE* source_file = fopen(file_info.source_path.c_str(), "rb");
+             source_file = fopen(file_info.source_path.c_str(), "rb");
              if (!source_file) {
                  if (error_callback) {
                      error_callback(CANT_OPEN_FILE + file_info.source_path);
                  }
-                 free(aligned_buffer);
-                 // 安装发生错误，调用清理函数
-                 cleanupCopiedFilesAndDirectories_forError(copied_files_list, progress_callback, total_files);
-                 return false;
+                 is_error = true;
+                 goto cleanup;
              }
             
             // SD卡块对齐读取优化 (SD Card block-aligned read optimization)
@@ -1654,6 +1661,7 @@ bool ModManager::copyFilesBatch(const std::vector<FileInfo>& file_info_list,
              
              size_t bytes_read = fread(file_data.data(), 1, file_size, source_file);
              fclose(source_file);
+             source_file = nullptr; // 重置文件句柄
              
              if (bytes_read == file_size) {
                  cached_files.push_back({file_info.target_path, std::move(file_data)});
@@ -1666,32 +1674,26 @@ bool ModManager::copyFilesBatch(const std::vector<FileInfo>& file_info_list,
                  if (error_callback) {
                      error_callback(CANT_READ_ERROR + file_info.source_path);
                  }
-                 free(aligned_buffer);
-                 // 安装发生错误，调用清理函数
-                 cleanupCopiedFilesAndDirectories_forError(copied_files_list, progress_callback, total_files);
-                 return false;
+                 is_error = true;
+                 goto cleanup;
              }
          } else {
              // 处理大文件：先写入所有缓存的小文件，然后立即处理大文件 (Process large files: flush all cached small files first, then process large file immediately)
              if (!cached_files.empty()) {
                  if (!flush_cached_files()) {
-                     free(aligned_buffer);
-                     // 安装发生错误，调用清理函数
-                     cleanupCopiedFilesAndDirectories_forError(copied_files_list, progress_callback, total_files);
-                     return false;
+                     is_error = true;
+                     goto cleanup;
                  }
              }
              
              // 打开源文件 (Open source file)
-             FILE* source_file = fopen(file_info.source_path.c_str(), "rb");
+             source_file = fopen(file_info.source_path.c_str(), "rb");
              if (!source_file) {
                  if (error_callback) {
                      error_callback(CANT_OPEN_FILE + file_info.source_path);
                  }
-                 free(aligned_buffer);
-                 // 安装发生错误，调用清理函数
-                 cleanupCopiedFilesAndDirectories_forError(copied_files_list, progress_callback, total_files);
-                 return false;
+                 is_error = true;
+                 goto cleanup;
              }
              
              // SD卡块对齐缓冲区优化 (SD Card block-aligned buffer optimization)
@@ -1700,16 +1702,13 @@ bool ModManager::copyFilesBatch(const std::vector<FileInfo>& file_info_list,
              long file_size = static_cast<long>(file_info.file_size);
              
              // 打开目标文件 (Open destination file)
-             FILE* dest_file = fopen(file_info.target_path.c_str(), "wb");
+             dest_file = fopen(file_info.target_path.c_str(), "wb");
              if (!dest_file) {
-                 fclose(source_file);
                  if (error_callback) {
                      error_callback(CANT_CREATE_DIR + file_info.target_path + ", errno: " + std::to_string(errno));
                  }
-                 free(aligned_buffer);
-                 // 安装发生错误，调用清理函数
-                 cleanupCopiedFilesAndDirectories_forError(copied_files_list, progress_callback, total_files);
-                 return false;
+                 is_error = true;
+                 goto cleanup;
              }
              
              // SD卡块对齐写入缓冲区 (SD Card block-aligned write buffer)
@@ -1729,12 +1728,8 @@ bool ModManager::copyFilesBatch(const std::vector<FileInfo>& file_info_list,
              while (total_read < (size_t)file_size && file_success) {
                  // 在文件复制过程中检查是否需要停止 (Check if stop is requested during file copy)
                  if (stop_token.stop_requested()) {
-                     fclose(source_file);
-                     fclose(dest_file);
-                     free(aligned_buffer); // 使用free释放memalign分配的内存
-                     // 触发中断的清理函数
-                     cleanupCopiedFilesAndDirectories(copied_files_list, progress_callback, total_files);
-                     return false;
+                     is_stopped = true;
+                     goto cleanup;
                  }
                  
                  // 计算块对齐的读取大小 (Calculate block-aligned read size)
@@ -1753,8 +1748,11 @@ bool ModManager::copyFilesBatch(const std::vector<FileInfo>& file_info_list,
                  if (bytes_read > 0) {
                      // 写入实际读取的字节数，不进行块对齐填充 (Write actual bytes read, no block alignment padding)
                      if (fwrite(aligned_buffer, 1, bytes_read, dest_file) != bytes_read) {
-                         file_success = false;
-                         break;
+                        if (error_callback) {
+                            error_callback(CANT_WRITE_ERROR + file_info.target_path);
+                        }
+                        is_error = true;
+                        goto cleanup;
                      }
                      total_read += bytes_read;
                      
@@ -1770,25 +1768,16 @@ bool ModManager::copyFilesBatch(const std::vector<FileInfo>& file_info_list,
              }
               
               // 关闭文件句柄 (Close file handles)
-              fclose(source_file);
-              fclose(dest_file);
-              
-              // 统一的错误处理 - 发生错误立即停止安装 (Unified error handling - stop installation immediately on error)
-              if (!file_success) {
-                  if (error_callback) {
-                      if (ferror(source_file)) {
-                          error_callback(CANT_READ_ERROR + file_info.source_path);
-                      } else {
-                          error_callback(CANT_WRITE_ERROR + file_info.target_path);
-                      }
-                  }
-                  // 清理块对齐缓冲区 (Clean up block-aligned buffers)
-                  free(aligned_buffer);
-                  // 安装发生错误，调用清理函数并立即停止 (Installation error occurred, cleanup and stop immediately)
-                  cleanupCopiedFilesAndDirectories_forError(copied_files_list, progress_callback, total_files);
-                  
-                  return false; // 立即停止安装 (Stop installation immediately)
+              if (source_file) {
+                  fclose(source_file);
+                  source_file = nullptr;
               }
+              if (dest_file) {
+                  fclose(dest_file);
+                  dest_file = nullptr;
+              }
+              
+              
               
               // 文件复制成功，更新计数和进度 (File copy successful, update count and progress)
               copied_files++;
@@ -1802,15 +1791,41 @@ bool ModManager::copyFilesBatch(const std::vector<FileInfo>& file_info_list,
      
      // 处理剩余的小文件缓存 (Process remaining cached small files)
      if (!flush_cached_files()) {
-         // 安装发生错误，调用清理函数
-         cleanupCopiedFilesAndDirectories_forError(copied_files_list, progress_callback, total_files);
-         overall_success = false;
+         is_error = true;
+         goto cleanup;
      }
      
-     // 清理块对齐缓冲区 (Clean up block-aligned buffers)
-     free(aligned_buffer); // 使用free释放memalign分配的内存
+     // 正常完成时清理缓冲区 (Clean up buffer on normal completion)
+     if (aligned_buffer) {
+         free(aligned_buffer);
+         aligned_buffer = nullptr;
+     }
      
-     return overall_success;
+     return true;
+
+cleanup:
+     // 统一资源清理 (Unified resource cleanup)
+     if (source_file) {
+         fclose(source_file);
+         source_file = nullptr;
+     }
+     if (dest_file) {
+         fclose(dest_file);
+         dest_file = nullptr;
+     }
+     if (aligned_buffer) {
+         free(aligned_buffer);
+         aligned_buffer = nullptr;
+     }
+     
+     // 根据错误类型调用相应的清理函数 (Call appropriate cleanup function based on error type)
+     if (is_stopped) {
+         cleanupCopiedFilesAndDirectories(copied_files_list, progress_callback, total_files);
+     } else if (is_error) {
+         cleanupCopiedFilesAndDirectories_forError(copied_files_list, progress_callback, total_files);
+     }
+     
+     return false;
 }
 
 // // 批量复制文件（简化版本，不聚集小文件，直接按顺序写入），不如带聚合的，备用不删了
