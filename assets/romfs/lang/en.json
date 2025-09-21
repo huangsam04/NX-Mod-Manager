@@ -138,8 +138,8 @@
 "MTP_WRITEING_DONE_TAG": "[Write Done]:",
 "MTP_CREATE_FILE_TAG": "[Create File]:",
 "MTP_READING_DONE_TAG": "[Read Done]:",
-"MTP_WRITEING_PROGRESS_TAG": "[Writing]: Written [color=BLUE]%.1fMB[/color], Speed [color=BLUE]%.1fMB/s[/color], File: [color=BLUE]%s[/color]",
-"MTP_READING_PROGRESS_TAG": "[Reading]: Read [color=BLUE]%.1fMB[/color], Speed [color=BLUE]%.1fMB/s[/color], File: [color=BLUE]%s[/color]",
+"MTP_WRITEING_PROGRESS_TAG": "[Writing]: Written [color=BLUE]%.1fMB[/color], Speed [color=BLUE]%.1fMB/s[/color], Time: [color=BLUE]%s[/color]",
+"MTP_READING_PROGRESS_TAG": "[Reading]: Read [color=BLUE]%.1fMB[/color], Speed [color=BLUE]%.1fMB/s[/color], Time: [color=BLUE]%s[/color]",
 "LIST_DIALOG_MTP": "MTP Transfer",
 
 "FORCE_CLEAN_CONFIRM": "Confirm force clean [%s]?\n\nNote: Same files in other installed MODs will cause errors.",

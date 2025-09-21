@@ -138,8 +138,8 @@
 "MTP_WRITEING_DONE_TAG": "[Schreiben abgeschlossen]:",
 "MTP_CREATE_FILE_TAG": "[Datei erstellen]:",
 "MTP_READING_DONE_TAG": "[Lesen abgeschlossen]:",
-"MTP_WRITEING_PROGRESS_TAG": "[Schreibe]: Geschrieben [color=BLUE]%.1fMB[/color], Geschw. [color=BLUE]%.1fMB/s[/color], Datei: [color=BLUE]%s[/color]",
-"MTP_READING_PROGRESS_TAG": "[Lese]: Gelesen [color=BLUE]%.1fMB[/color], Geschw. [color=BLUE]%.1fMB/s[/color], Datei: [color=BLUE]%s[/color]",
+"MTP_WRITEING_PROGRESS_TAG": "[Schreibe]: Geschrieben [color=BLUE]%.1fMB[/color], Geschw. [color=BLUE]%.1fMB/s[/color], Zeit: [color=BLUE]%s[/color]",
+"MTP_READING_PROGRESS_TAG": "[Lese]: Gelesen [color=BLUE]%.1fMB[/color], Geschw. [color=BLUE]%.1fMB/s[/color], Zeit: [color=BLUE]%s[/color]",
 "LIST_DIALOG_MTP": "MTP-Übertragung",
 
 "FORCE_CLEAN_CONFIRM": "Zwingende Bereinigung [%s] bestätigen?\n\nHinweis: Gleiche Dateien in anderen MODs verursachen Fehler.",
