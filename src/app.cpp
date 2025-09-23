@@ -7857,8 +7857,18 @@ void App::newListMenuCenter(const std::string& function) {
         } else if (function == LIST_DIALOG_ABOUTAUTHOR) {        // 关于作者
 
             this->audio_manager.PlayConfirmSound(1.0);
-            newShowDialogConfirm("作者：TOM\n版本：2.1.3\nQ群：1051287661\n任何BUG欢迎来群反馈",nullptr,
+
+            #define STRINGIZE(x) #x 
+            #define STRINGIZE_VALUE_OF(x) STRINGIZE(x) 
+
+            std::string version = STRINGIZE_VALUE_OF(UNTITLED_VERSION_STRING);
+            
+            newShowDialogConfirm(("作者：TOM\n版本：" + version + "\nQ群：1051287661\n任何BUG欢迎来群反馈"),nullptr,
                         26.0f,NVG_ALIGN_LEFT|NVG_ALIGN_MIDDLE);
+    
+            #undef STRINGIZE
+            #undef STRINGIZE_VALUE_OF
+            
             
         } else if (function == LIST_DIALOG_ViewDetails) {        // 查看位置
 
