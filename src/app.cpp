@@ -5401,7 +5401,7 @@ void App::UpdateInstruction() {
     }
     
     // 右键：下一张图片 (RIGHT key: next image)
-    constexpr int TOTAL_IMAGES = 7; // 总共7张教程图片 (Total 6 instruction images)
+    constexpr int TOTAL_IMAGES = 8; // 总共8张教程图片 (Total 6 instruction images)
     if (this->controller.RIGHT) {
         if (this->instruction_image_index < TOTAL_IMAGES - 1) {
             // 正常切换到下一张图片 (Normal switch to next image)
@@ -5438,10 +5438,11 @@ void App::DrawInstruction() {
         "romfs:/Instruction/5.jpg",
         "romfs:/Instruction/6.jpg",
         "romfs:/Instruction/7.jpg",
+        "romfs:/Instruction/8.jpg",
     };
 
 
-    constexpr int TOTAL_IMAGES = 7; // 总图片数量 (Total number of images)
+    constexpr int TOTAL_IMAGES = 8; // 总图片数量 (Total number of images)
     
     // 使用局部静态变量管理图片资源 (Use local static variables to manage image resources)
     static int cached_image_id = -1;        // 当前缓存的图片ID (Currently cached image ID)
