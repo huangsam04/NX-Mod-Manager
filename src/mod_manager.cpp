@@ -1077,38 +1077,51 @@ bool ModManager::installModFromZipDirect(const std::string& zip_path,
                                         ErrorCallback error_callback,
                                         std::stop_token stop_token) {
     
-    
     if (progress_callback) {
         progress_callback(0, 0, CALCULATE_FILES, false, 0.0f, "", COLOR_BLUE);
     }
 
-    // 初始化ZIP读取器检查内部结构
+    // 资源管理变量 (Resource management variables)
     mz_zip_archive zip_archive;
+    bool zip_initialized = false;
+    bool is_error = false;
+    bool is_stopped = false;
+    bool extract_success = false;
+    std::vector<std::string> all_directories; // 移到资源管理区域
+    std::set<std::string> first_level_dirs;
+    std::vector<int> files_to_extract; // 储存过滤后的文件索引
+    int num_files = 0;
+    int files_total = 0;
+
+    // 初始化ZIP读取器检查内部结构 (Initialize ZIP reader to check internal structure)
     memset(&zip_archive, 0, sizeof(zip_archive));
     
     if (!mz_zip_reader_init_file(&zip_archive, zip_path.c_str(), 0)) {
         if (error_callback) {
             error_callback(ZIP_OPEN_ERROR + zip_path);
         }
-        return false;
+        return false; // ZIP初始化失败，无需cleanup
     }
+    zip_initialized = true; // 标记ZIP已初始化
     
-    // 第一阶段：遍历ZIP文件收集所有目录
-    std::vector<std::string> all_directories; // 直接使用vector收集目录列表
-    std::set<std::string> first_level_dirs;
-    std::vector<int> files_to_extract; //储存过滤后的文件索引
-    int num_files = static_cast<int>(mz_zip_reader_get_num_files(&zip_archive));
-    int files_total = 0;
+    // 获取ZIP文件数量 (Get ZIP file count)
+    num_files = static_cast<int>(mz_zip_reader_get_num_files(&zip_archive));
     
+    // 第一阶段：遍历ZIP文件收集所有目录 (Phase 1: Traverse ZIP files to collect all directories)
     for (int i = 0; i < num_files; i++) {
+        // 检查停止请求 (Check stop request)
+        if (stop_token.stop_requested()) {
+            is_stopped = true;
+            goto cleanup;
+        }
         
         mz_zip_archive_file_stat file_stat;
         if (!mz_zip_reader_file_stat(&zip_archive, i, &file_stat)) {
-            mz_zip_reader_end(&zip_archive);
+            is_error = true;
             if (error_callback) {
                 error_callback(ZIP_READ_ERROR + zip_path);
             }
-            return false;
+            goto cleanup;
         }
         
         std::string filename = file_stat.m_filename;
@@ -1138,14 +1151,13 @@ bool ModManager::installModFromZipDirect(const std::string& zip_path,
                 // 计算目标文件的CRC32进行比较
                 u32 existing_file_crc32 = GetFileCrc32(target_file_path.c_str());
                 if (zip_file_crc32 != existing_file_crc32) {
-                    // 校验不同，代表是同名文件(本质不同的文件)，关闭ZIP读取器并报错
-                    mz_zip_reader_end(&zip_archive);
-                    // 从zip_path中提取/mods2/游戏名/id/mod名字路径
+                    // 校验不同，代表是同名文件(本质不同的文件) (Verification failed, indicating same-name files with different content)
+                    is_error = true;
+                    // 从zip_path中提取/mods2/游戏名/id/mod名字路径 (Extract mod directory path from zip_path)
                     std::string mod_dir_path = zip_path.substr(0, zip_path.rfind('/'));
-                    // 检查是哪个mod冲突
+                    // 检查是哪个mod冲突 (Check which mod is conflicting)
                     GetConflictingModNames(mod_dir_path, target_file_path, progress_callback, error_callback, stop_token);
-                    return false;
-
+                    goto cleanup;
                 }
 
                 // 缓存发生冲突且通过CRC32校验的目标文件路径
@@ -1197,49 +1209,63 @@ bool ModManager::installModFromZipDirect(const std::string& zip_path,
 
     }
 
-    
 
-    // 第二阶段：检查收集到的目录的合法性
+    // 第二阶段：检查收集到的目录的合法性 (Phase 2: Check validity of collected directories)
     if (first_level_dirs.size() > 2 || first_level_dirs.empty()) {
+        is_error = true;
         if (error_callback) {
             error_callback(FILE_NONE);
         }
-        return false;
+        goto cleanup;
     }
 
-    
     for (const std::string& dir_name : first_level_dirs) {
         if (dir_name != "contents" && dir_name != "exefs_patches") {
+            is_error = true;
             if (error_callback) {
                 error_callback(FILE_NONE + dir_name);
             }
-            return false;
+            goto cleanup;
         }
     }
     
     // 使用批量创建目录函数优化性能 (Use batch directory creation function to optimize performance)
     if (!createDirectoriesBatch(all_directories, progress_callback, num_files, error_callback, stop_token)) {
-        // 创建失败时及时清除目录列表，释放内存 (Clear directory list promptly on failure to free memory)
-        all_directories.clear();
-        all_directories.shrink_to_fit();
-        return false;
+        is_error = true;
+        goto cleanup;
     }
     
     // 目录创建成功后及时清除目录列表，释放内存 (Clear directory list promptly after successful creation to free memory)
     all_directories.clear();
     all_directories.shrink_to_fit();
     
-    // 直接解压到atmosphere目录（目录已预创建）
-    bool extract_success = extractMod(zip_path, files_total, files_to_extract, progress_callback, error_callback, stop_token, &zip_archive);
-    //完成解压后关闭ZIP读取器
-    mz_zip_reader_end(&zip_archive);
-
-    // 解压安装成功则将冲突文件写入本地
-    if (extract_success) {
-        CachedConflictingFiles(zip_path, progress_callback);
+    // 直接解压到atmosphere目录（目录已预创建） (Extract directly to atmosphere directory - directories pre-created)
+    extract_success = extractMod(zip_path, files_total, files_to_extract, progress_callback, error_callback, stop_token, &zip_archive);
+    
+    if (!extract_success) {
+        is_error = true;
+        goto cleanup;
     }
     
-    return extract_success;
+    // 解压安装成功则将冲突文件写入本地 (Cache conflicting files locally if extraction succeeds)
+    CachedConflictingFiles(zip_path, progress_callback);
+
+cleanup:
+    // 统一资源清理 (Unified resource cleanup)
+    if (zip_initialized) {
+        mz_zip_reader_end(&zip_archive);
+    }
+    
+    // 清理目录列表内存 (Clean up directory list memory)
+    all_directories.clear();
+    all_directories.shrink_to_fit();
+    
+    // 根据状态返回结果 (Return result based on status)
+    if (is_stopped) {
+        return false; // 用户停止请求 (User stop request)
+    }
+    
+    return !is_error; // 成功返回true，错误返回false (Return true on success, false on error)
 }
 
 bool ModManager::installModFromFolder(const std::string& folder_path,
