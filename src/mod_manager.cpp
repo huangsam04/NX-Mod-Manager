@@ -37,6 +37,7 @@ ModManager::~ModManager() {
 // extractMod函数：简化版本，不使用小文件聚合，直接按顺序写入SD卡 (extractMod2 function: simplified version, no small file aggregation, direct sequential write to SD card)
 bool ModManager::extractMod(const std::string& zip_path,
                             int& files_total,
+                            std::vector<int>& files_to_extract,
                             ProgressCallback progress_callback,
                             ErrorCallback error_callback,
                             std::stop_token stop_token,
@@ -45,8 +46,16 @@ bool ModManager::extractMod(const std::string& zip_path,
     // 直接使用传入的已初始化ZIP读取器
     mz_zip_archive* zip_archive = static_cast<mz_zip_archive*>(zip_archive_ptr);
     
-    // 获取文件数量 (Get file count)
-    int num_files = static_cast<int>(mz_zip_reader_get_num_files(zip_archive));
+    // 获取要解压的文件数量 (Get number of files to extract)
+    int num_files = files_to_extract.size();
+
+    if (num_files == 0) {
+        if (error_callback) {
+            error_callback("请勿安装重复的MOD！");
+        }
+        return false;
+    }
+
     int processed_files = 0;
     
     // SD卡块对齐优化策略 (SD Card Block Alignment Optimization Strategy)
@@ -72,7 +81,7 @@ bool ModManager::extractMod(const std::string& zip_path,
     
     // 用于存储已复制的文件路径，即使这个文件没有真的被复制。
     std::vector<std::string> extracted_files;
-    // 提取每个文件，直接按顺序写入 (Extract each file, write directly in sequence)
+    // 只解压过滤后的文件索引 (Extract only filtered file indices)
     for (int i = 0; i < num_files; i++) {
         // 检查是否需要停止 (Check if stop is requested)
         if (stop_token.stop_requested()) {
@@ -80,8 +89,11 @@ bool ModManager::extractMod(const std::string& zip_path,
             goto cleanup;
         }
         
+        // 获取当前要处理的文件索引 (Get current file index to process)
+        int file_index = files_to_extract[i];
+        
         mz_zip_archive_file_stat file_stat;
-        if (!mz_zip_reader_file_stat(zip_archive, i, &file_stat)) {
+        if (!mz_zip_reader_file_stat(zip_archive, file_index, &file_stat)) {
             is_error = true;
             if (error_callback) {
                 error_callback(ZIP_READ_ERROR + zip_path);
@@ -89,10 +101,7 @@ bool ModManager::extractMod(const std::string& zip_path,
             goto cleanup;
         }
         
-        // 跳过目录条目 (Skip directory entries)
-        if (mz_zip_reader_is_file_a_directory(zip_archive, i)) {
-            continue;
-        }
+        // files_to_extract 中已经过滤了目录，这里不需要再检查 (files_to_extract already filtered directories, no need to check here)
         
         // 构建完整的目标文件路径 (Build complete target file path)
         std::string target_file_path = target_directory_zip + file_stat.m_filename;
@@ -107,7 +116,7 @@ bool ModManager::extractMod(const std::string& zip_path,
         }
         
         // 创建流式解压迭代器 (Create streaming extraction iterator)
-        iter_state = mz_zip_reader_extract_iter_new(zip_archive, i, 0);
+        iter_state = mz_zip_reader_extract_iter_new(zip_archive, file_index, 0);
         if (!iter_state) {
             is_error = true;
             if (error_callback) {
@@ -1087,10 +1096,12 @@ bool ModManager::installModFromZipDirect(const std::string& zip_path,
     // 第一阶段：遍历ZIP文件收集所有目录
     std::vector<std::string> all_directories; // 直接使用vector收集目录列表
     std::set<std::string> first_level_dirs;
+    std::vector<int> files_to_extract; //储存过滤后的文件索引
     int num_files = static_cast<int>(mz_zip_reader_get_num_files(&zip_archive));
     int files_total = 0;
     
     for (int i = 0; i < num_files; i++) {
+        
         mz_zip_archive_file_stat file_stat;
         if (!mz_zip_reader_file_stat(&zip_archive, i, &file_stat)) {
             mz_zip_reader_end(&zip_archive);
@@ -1113,7 +1124,7 @@ bool ModManager::installModFromZipDirect(const std::string& zip_path,
         // 收集所有需要创建的目录路径（包括所有父目录层次）- 优化版本
         if (!mz_zip_reader_is_file_a_directory(&zip_archive, i)) {
             
-            // 检查目标文件是否已存在，如果存在则立即报错并停止
+            // 检查目标文件是否已存在，如果存在
             std::string target_file_path;
             target_file_path.reserve(target_directory_zip.length() + filename.length());
             target_file_path = target_directory_zip;
@@ -1121,14 +1132,27 @@ bool ModManager::installModFromZipDirect(const std::string& zip_path,
             
             // 使用access()检查文件是否存在（F_OK表示检查文件存在性）
             if (access(target_file_path.c_str(), F_OK) == 0) {
-                // 文件已存在，关闭ZIP读取器并报错
-                mz_zip_reader_end(&zip_archive);
-                // 从zip_path中提取/mods2/游戏名/id/mod名字路径
-                std::string mod_dir_path = zip_path.substr(0, zip_path.rfind('/'));
-                // 检查是哪个mod冲突
-                GetConflictingModNames(mod_dir_path, target_file_path, progress_callback, error_callback, stop_token);
-                return false;
-            }
+                if (progress_callback) progress_callback(0, files_total, "校验CRC32冲突...", false, 0.0f, "", COLOR_BLUE);
+                // 如果检查目标文件已存在，就获取这个zip文件的crc32的值
+                u32 zip_file_crc32 = file_stat.m_crc32;  // 获取ZIP中文件的CRC32值
+                // 计算目标文件的CRC32进行比较
+                u32 existing_file_crc32 = GetFileCrc32(target_file_path.c_str());
+                if (zip_file_crc32 != existing_file_crc32) {
+                    // 校验不同，代表是同名文件(本质不同的文件)，关闭ZIP读取器并报错
+                    mz_zip_reader_end(&zip_archive);
+                    // 从zip_path中提取/mods2/游戏名/id/mod名字路径
+                    std::string mod_dir_path = zip_path.substr(0, zip_path.rfind('/'));
+                    // 检查是哪个mod冲突
+                    GetConflictingModNames(mod_dir_path, target_file_path, progress_callback, error_callback, stop_token);
+                    return false;
+
+                }
+
+                // 缓存发生冲突且通过CRC32校验的目标文件路径
+                cached_conflicting_files.push_back(target_file_path);
+                
+            } else files_to_extract.push_back(i); // 缓存过滤后需要解压的文件索引
+
             
             size_t last_slash = filename.find_last_of('/');
             if (last_slash != std::string::npos) {
@@ -1206,9 +1230,14 @@ bool ModManager::installModFromZipDirect(const std::string& zip_path,
     all_directories.shrink_to_fit();
     
     // 直接解压到atmosphere目录（目录已预创建）
-    bool extract_success = extractMod(zip_path, files_total, progress_callback, error_callback, stop_token, &zip_archive);
+    bool extract_success = extractMod(zip_path, files_total, files_to_extract, progress_callback, error_callback, stop_token, &zip_archive);
     //完成解压后关闭ZIP读取器
     mz_zip_reader_end(&zip_archive);
+
+    // 解压安装成功则将冲突文件写入本地
+    if (extract_success) {
+        CachedConflictingFiles(zip_path, progress_callback);
+    }
     
     return extract_success;
 }
@@ -1239,6 +1268,8 @@ bool ModManager::installModFromFolder(const std::string& folder_path,
     
     struct dirent* entry;
     while ((entry = readdir(dir)) != nullptr) {
+
+        
         if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0) {
             continue;
         }
@@ -1345,7 +1376,6 @@ bool ModManager::installModFromFolder(const std::string& folder_path,
                     if (directories_to_create.size() >= directories_to_create.capacity() * 0.8) {
                         directories_to_create.reserve(directories_to_create.capacity() + 100);
                     }
-                    
                     // 收集目录路径，延迟创建 (Collect directory path for delayed creation)
                     directories_to_create.push_back(target_file_path);
                     // 将子目录推入栈中处理 (Push subdirectory into stack for processing)
@@ -1353,13 +1383,22 @@ bool ModManager::installModFromFolder(const std::string& folder_path,
                 } else if (entry->d_type == DT_REG) {
                     // 使用access()检查文件是否存在（F_OK表示检查文件存在性）
                     if (access(target_file_path.c_str(), F_OK) == 0) {
-                        // 检查是哪个mod冲突 (Check which mod conflicts)
-                        GetConflictingModNames(folder_path, target_file_path, progress_callback, error_callback, stop_token);
-                        // 标记有错误 (Mark error)
-                        countFuncErr = true;
-                        // 存在冲突，停止循环 (Conflict exists, stop loop)
-                        closedir(dir);
-                        return total_count;
+                        if (progress_callback) progress_callback(0, global_file_count, "校验CRC32冲突...", false, 0.0f, "", COLOR_BLUE);
+                        // 计算源文件的CRC32进行比较
+                        u32 source_file_crc32 = GetFileCrc32(source_file_path.c_str());
+                        // 计算目标文件的CRC32进行比较
+                        u32 target_file_crc32 = GetFileCrc32(target_file_path.c_str());
+                        // 比较CRC32值 (Compare CRC32 values)
+                        if (source_file_crc32 != target_file_crc32) {
+                            // 检查是哪个mod冲突 (Check which mod conflicts)
+                            GetConflictingModNames(folder_path, target_file_path, progress_callback, error_callback, stop_token);
+                            // 标记有错误 (Mark error)
+                            countFuncErr = true;
+                            // 存在冲突，停止循环 (Conflict exists, stop loop)
+                            closedir(dir);
+                            return total_count;
+                        }
+                        
                     }
                     
                     // 获取文件大小并缓存文件信息 (Get file size and cache file info)
@@ -1650,12 +1689,10 @@ bool ModManager::copyFilesBatch(const std::vector<FileInfo>& file_info_list,
                  goto cleanup;
              }
             
-            // SD卡块对齐读取优化 (SD Card block-aligned read optimization)
+            // 小文件直接读取，不进行块对齐填充 (Small files read directly without block alignment padding)
              size_t file_size = file_info.file_size;
-             size_t aligned_size = ((file_size + SD_BLOCK_SIZE - 1) / SD_BLOCK_SIZE) * SD_BLOCK_SIZE;
              std::vector<char> file_data;
-             file_data.reserve(aligned_size);
-             file_data.resize(aligned_size, 0);
+             file_data.resize(file_size);  // 只分配实际文件大小
              
              setvbuf(source_file, nullptr, _IOFBF, ALIGNED_BUFFER_SIZE);
              
@@ -1665,7 +1702,7 @@ bool ModManager::copyFilesBatch(const std::vector<FileInfo>& file_info_list,
              
              if (bytes_read == file_size) {
                  cached_files.push_back({file_info.target_path, std::move(file_data)});
-                 total_cached_size += aligned_size;
+                 total_cached_size += file_size;  // 使用实际文件大小
                  
                  if (progress_callback) {
                      progress_callback(copied_files, total_files, Aggregating_Files, false, 0.0f, "", COLOR_BLUE);
@@ -2507,8 +2544,9 @@ void ModManager::GetConflictingModNames(const std::string& mod_dir_path,const st
 void ModManager::cleanupCopiedFilesAndDirectories(std::vector<std::string>& copied_files,
                                                  ProgressCallback progress_callback,
                                                  int total_items) {            
+
     size_t delete_items = copied_files.size();
-    
+
     // 先删除所有复制的文件，失败也不管 (Delete all copied files first, ignore failures)
     for (const std::string& file_path : copied_files) {
         remove(file_path.c_str()); // 删除文件，忽略错误 (Delete file, ignore errors)
@@ -2552,6 +2590,125 @@ void ModManager::cleanupCopiedFilesAndDirectories(std::vector<std::string>& copi
     cached_created_directories.clear();
 }
 
+// 从路径中提取/mods2/游戏名/ID部分 (Extract /mods2/game_name/ID from path)
+std::string ModManager::GetFilePath(const std::string& path) {
+    // 查找第三个'/'的位置，即/mods2/游戏名/ID后面的'/' (Find the position of the third '/', after /mods2/game_name/ID)
+    size_t slash_count = 0;
+    size_t pos = 0;
+    
+    for (size_t i = 0; i < path.length(); ++i) {
+        if (path[i] == '/') {
+            slash_count++;
+            if (slash_count == 3) {
+                pos = i;
+                break;
+            }
+        }
+    }
+    
+    // 返回从开头到第三个'/'之前的部分 (Return the part from the beginning to before the third '/')
+    return path.substr(0, pos);
+}
+
+std::string ModManager::GetModFileCommonPath(const std::string& path) {
+
+    std::string file_path = GetFilePath(path);
+
+    return file_path + "/mod_file_common.json";
+    
+}
+
+/**
+ * 使用libnx硬件加速计算文件的CRC32值
+ * @param file_path 文件路径
+ * @return 文件的CRC32值，失败时返回0
+ */
+u32 ModManager::GetFileCrc32(const char* file_path) {
+    // 打开文件
+    FILE* file = fopen(file_path, "rb");
+    if (!file) {
+        return 0; // 文件打开失败
+    }
+    
+    // 获取文件大小
+    fseek(file, 0, SEEK_END);
+    long file_size = ftell(file);
+    fseek(file, 0, SEEK_SET);
+    
+    if (file_size <= 0) {
+        fclose(file);
+        return 0; // 文件大小无效
+    }
+    
+    // 初始化CRC32值
+    u32 crc32 = 0;
+    
+    // 读取缓冲区大小（64KB）
+    const size_t buffer_size = 65536;
+    unsigned char* buffer = (unsigned char*)malloc(buffer_size);
+    if (!buffer) {
+        fclose(file);
+        return 0; // 内存分配失败
+    }
+    
+    // 分块读取文件并使用libnx硬件加速计算CRC32
+    size_t bytes_read;
+    while ((bytes_read = fread(buffer, 1, buffer_size, file)) > 0) {
+        // 使用libnx的硬件加速CRC32函数
+        crc32 = crc32CalculateWithSeed(crc32, buffer, bytes_read);
+    }
+    
+    // 清理资源
+    free(buffer);
+    fclose(file);
+    
+    return crc32;
+}
+
+void ModManager::CachedConflictingFiles(const std::string& path,ProgressCallback progress_callback) {
+
+    if (cached_conflicting_files.empty()) return;
+    
+    size_t files_total = cached_conflicting_files.size();
+    size_t current_file_index = 0;
+    
+    if (progress_callback) {
+        progress_callback(current_file_index, files_total, "保留冲突记录中...", false, 0.0f, "", COLOR_BLUE);
+    }
+    
+    
+    
+    // 获取当前mod的通用文件json路径
+    std::string mod_file_common_path = GetModFileCommonPath(path);
+    
+    for (std::string& target_file_path : cached_conflicting_files) {
+
+        // 统计文件安装次数 (Count file installation times)
+        std::string current_count_str = tj::JsonManager::GetRootJsonValue(mod_file_common_path, target_file_path);
+        int install_count = 1; // 默认为1 (Default to 1)
+        
+        // 如果返回值不等于键名，说明键存在，解析计数值 (If return value is not equal to key name, key exists, parse count value)
+        if (current_count_str != target_file_path) {
+            install_count = std::stoi(current_count_str) + 1; // 递增计数 (Increment count)
+        }
+        
+        // 更新JSON文件中的计数值 (Update count value in JSON file)
+        tj::JsonManager::UpdateRootJsonKeyValue(mod_file_common_path, target_file_path, std::to_string(install_count));
+
+        if (progress_callback) {
+            progress_callback(current_file_index, files_total, "保留冲突记录中...", false, 0.0f, "", COLOR_BLUE);
+        }
+        current_file_index++;
+
+    }
+
+    // 清空缓存的目标文件列表 (Clear cached target file list)
+    cached_conflicting_files.clear();
+    
+}
+
+
+
 // 当安装出错的时候调用这个函数，基本和cleanupCopiedFilesAndDirectories一致
 void ModManager::cleanupCopiedFilesAndDirectories_forError(std::vector<std::string>& copied_files,
                                                  ProgressCallback progress_callback,
@@ -2559,12 +2716,6 @@ void ModManager::cleanupCopiedFilesAndDirectories_forError(std::vector<std::stri
     
 
 
-    
-    // 立即播放错误音效 (Play error sound immediately)
-    if (g_audio_manager) {
-        g_audio_manager->PlayCancelSound(1.0f);
-    }
-                                                    
     size_t delete_items = copied_files.size();
     
     // 先删除所有复制的文件，失败也不管 (Delete all copied files first, ignore failures)

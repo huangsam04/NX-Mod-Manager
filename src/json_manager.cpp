@@ -505,6 +505,75 @@ bool JsonManager::WriteJsonFile(const std::string& json_path, yyjson_mut_doc* mu
     return written == json_len;
 }
 
+// 获取根级JSON键的值，如果键不存在则返回键名本身
+// Get root-level JSON key value, return key name if key doesn't exist
+std::string JsonManager::GetRootJsonValue(const std::string& json_path, const std::string& key) {
+    // 确保JSON文件存在 (Ensure JSON file exists)
+    if (!EnsureJsonFileExists(json_path)) {
+        return key; // 文件不存在，返回键名 (File doesn't exist, return key name)
+    }
+    
+    // 打开文件进行读取 (Open file for reading)
+    FILE* file = fopen(json_path.c_str(), "rb");
+    if (!file) {
+        return key; // 无法打开文件，返回键名 (Cannot open file, return key name)
+    }
+    
+    // 获取文件大小 (Get file size)
+    fseek(file, 0, SEEK_END);
+    size_t file_size = ftell(file);
+    fseek(file, 0, SEEK_SET);
+    
+    // 读取文件内容 (Read file content)
+    char* json_data = (char*)malloc(file_size + 1);
+    if (!json_data) {
+        fclose(file);
+        return key; // 内存分配失败，返回键名 (Memory allocation failed, return key name)
+    }
+    
+    fread(json_data, 1, file_size, file);
+    json_data[file_size] = '\0';
+    fclose(file);
+    
+    // 解析JSON (Parse JSON)
+    yyjson_doc* doc = yyjson_read(json_data, file_size, 0);
+    free(json_data);
+    if (!doc) {
+        return key; // JSON解析失败，返回键名 (JSON parsing failed, return key name)
+    }
+    
+    yyjson_val* root = yyjson_doc_get_root(doc);
+    if (!root || !yyjson_is_obj(root)) {
+        yyjson_doc_free(doc);
+        return key; // 根对象无效，返回键名 (Invalid root object, return key name)
+    }
+    
+    // 查找根级键对应的值 (Find value for root-level key)
+    yyjson_val* val = yyjson_obj_get(root, key.c_str());
+    if (!val) {
+        yyjson_doc_free(doc);
+        return key; // 键不存在，返回键名 (Key doesn't exist, return key name)
+    }
+    
+    std::string result;
+    // 根据值的类型进行处理 (Handle different value types)
+    if (yyjson_is_str(val)) {
+        const char* str_val = yyjson_get_str(val);
+        result = str_val ? std::string(str_val) : key;
+    } else if (yyjson_is_int(val)) {
+        result = std::to_string(yyjson_get_int(val));
+    } else if (yyjson_is_real(val)) {
+        result = std::to_string(yyjson_get_real(val));
+    } else if (yyjson_is_bool(val)) {
+        result = yyjson_get_bool(val) ? "true" : "false";
+    } else {
+        result = key; // 其他类型，返回键名 (Other types, return key name)
+    }
+    
+    yyjson_doc_free(doc);
+    return result;
+}
+
 // 获取嵌套JSON键的值，如果根键或嵌套键不存在则返回根键
 // Get nested JSON key value, return root key if root key or nested key doesn't exist
 std::string JsonManager::GetNestedJsonValue(const std::string& json_path, const std::string& root_key, const std::string& nested_key) {

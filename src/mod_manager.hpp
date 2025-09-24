@@ -4,6 +4,7 @@
 #include <vector>
 #include <functional>
 #include <stop_token>
+#include <switch.h>  // 包含Switch平台的类型定义，如u32
 
 /**
  * MOD管理器类
@@ -49,6 +50,7 @@ public:
      */
     bool extractMod(const std::string& zip_path,
                      int& files_total,
+                     std::vector<int>& files_to_extract,
                      ProgressCallback progress_callback = nullptr,
                      ErrorCallback error_callback = nullptr,
                      std::stop_token stop_token = {},
@@ -259,7 +261,9 @@ public:
     std::string normalizePath(const std::string& path);
 
     std::string GetModJsonPath(const std::string& mod_dir_path);
+    std::string GetModFileCommonPath(const std::string& path);
     std::string GetModDirName(const std::string& mod_dir_path);
+    std::string GetFilePath(const std::string& path);
     // 从FILE_PATH中提取游戏目录名
     std::string GetGameDirName(const std::string& game_file_path);
 
@@ -276,6 +280,15 @@ public:
     void GetConflictingModNames(const std::string& mod_dir_path,const std::string& conflicting_file_Path,
                                 ProgressCallback progress_callback,ErrorCallback error_callback,std::stop_token stop_token);
 
+    void CachedConflictingFiles(const std::string& path,ProgressCallback progress_callback);
+
+    /**
+     * 使用libnx硬件加速计算文件的CRC32值
+     * @param file_path 文件路径
+     * @return 文件的CRC32值，失败时返回0
+     */
+    u32 GetFileCrc32(const char* file_path);
+
 private:
     // 缓存的目标文件路径列表，用于卸载时直接删除 (Cached target file paths for direct deletion during uninstall)
     std::vector<std::string> cached_target_files;
@@ -283,6 +296,9 @@ private:
     // 缓存的已创建目录路径列表，用于清理时删除空目录 (Cached created directory paths for cleanup of empty directories)
     std::vector<std::string> cached_created_directories;
 
+    // 缓存发生冲突且通过CRC32校验的目标文件路径 (Cached target file paths that conflict and pass CRC32 check)
+    std::vector<std::string> cached_conflicting_files;
+    
     // 临时增加两个变量，用于进度条颜色，后面重构一下回调函数，改成结构体
     static const int COLOR_BLUE[3];
     static const int COLOR_RED[3];
