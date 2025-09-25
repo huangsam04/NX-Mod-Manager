@@ -1427,6 +1427,8 @@ bool ModManager::installModFromFolder(const std::string& folder_path,
 
                         // 缓存发生冲突且通过CRC32校验的目标文件路径
                         cached_conflicting_files.push_back(target_file_path);
+                        total_count++;
+                        global_file_count++;
                         // 跳过这个文件路径
                         continue;
                         
