@@ -1547,10 +1547,12 @@ bool ModManager::installModFromFolder(const std::string& folder_path,
     if (!copyFilesBatch(cached_files, progress_callback, error_callback, stop_token)) {
         return false;
     }
-    
+
     // 及时清理缓存的文件路径，释放内存 (Clean up cached file paths promptly to free memory)
     cached_files.clear();
     cached_files.shrink_to_fit();
+
+    CachedConflictingFiles(folder_path, progress_callback);
 
     return true;
 }
