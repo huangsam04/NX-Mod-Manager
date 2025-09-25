@@ -5837,6 +5837,8 @@ int App::ModUninstalled() {
     
     // 立即显示卸载进度对话框 (Immediately show uninstall progress dialog)
     newShowDialogCopyProgress(UNINSTALLEDING_TEXT, this->mod_info[this->mod_index].MOD_NAME2);
+    // 标志，用于指示卸载是否正在进行 
+    this->mod_uninstalling = true;
     
     // 初始化进度信息，总文件数将在异步任务中更新 (Initialize progress info, total files will be updated in async task)
     {
@@ -7652,16 +7654,18 @@ void App::newUpdateDialogCopyProgress(){
 
     // 允许用户按B键取消任務
     if (this->controller.B) {
-        this->audio_manager.PlayCancelSound();
+        
 
         // 取消安装和卸载任务
-        if (copy_task.valid()) {
+        if (!this->mod_uninstalling && copy_task.valid()) {
+            this->audio_manager.PlayCancelSound();
             copy_task.request_stop();
             // 不立即隐藏对话框，让用户能看到清理进度
             // 等异步任务完成后再处理UI切换
             return;
         }
 
+        this->audio_manager.PlayCancelSound();
         // 取消添加任务
         if (add_task.valid()) {
             add_task.request_stop(); // 请求停止添加任务 (Request to stop add task)
@@ -7719,7 +7723,7 @@ void App::newUpdateDialogCopyProgress(){
         if (task_result) {
 
             this->audio_manager.PlayConfirmSound();
-
+            this->mod_uninstalling = false;
             // 任务处理时间
             std::string duration_str = FormatDuration(this->operation_duration.count() / 1000);
 
@@ -7744,7 +7748,8 @@ void App::newUpdateDialogCopyProgress(){
             
 
         } else {
-
+            
+            this->mod_uninstalling = false;
             // 处理异步任务失败情况，error_msg是报错信息，如果没有具体报错，就用默认报错信息。
             std::string error_msg;
 

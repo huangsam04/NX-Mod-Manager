@@ -529,7 +529,7 @@ DialogSearchCallback newdialog_search_callback{nullptr};
     // MOD管理器相关 (MOD manager related)
     ModManager mod_manager; // MOD压缩解压管理器 (MOD compression/decompression manager)
     util::AsyncFurture<bool> mod_install_task; // 异步MOD安装任务 (Async MOD installation task)
-    bool mod_install_in_progress{false}; // MOD安装是否正在进行 (Whether MOD installation is in progress)
+    bool mod_uninstalling{false}; // MOD卸载是否正在进行 (Whether MOD uninstallation is in progress)
     
     void Draw();
     void Update();
