@@ -639,4 +639,111 @@ std::string JsonManager::GetNestedJsonValue(const std::string& json_path, const 
     return result;
 }
 
+// MOD专用：处理mod_file_common.json的去重操作
+// MOD-specific: Process deduplication for mod_file_common.json
+bool JsonManager::ProcessModFileCommonDeduplication(const std::string& json_path, 
+                                                    std::vector<std::string>& target_files) {
+    
+    // 读取JSON文件 (Read JSON file)
+    yyjson_doc* doc = nullptr;
+    if (!ReadJsonFile(json_path, &doc)) {
+        // JSON文件不存在或读取失败，所有文件都可以删除，保持原列表不变 (JSON file doesn't exist or read failed, all files can be deleted, keep original list unchanged)
+        return true;
+    }
+    
+    // 获取根对象 (Get root object)
+    yyjson_val* root = yyjson_doc_get_root(doc);
+    if (!root || !yyjson_is_obj(root)) {
+        yyjson_doc_free(doc);
+        // 根对象无效，所有文件都可以删除，保持原列表不变 (Invalid root object, all files can be deleted, keep original list unchanged)
+        return true;
+    }
+    
+    // 检查JSON对象是否为空 (Check if JSON object is empty)
+    if (yyjson_obj_size(root) == 0) {
+        yyjson_doc_free(doc);
+        // JSON文件为空，所有文件都可以删除，保持原列表不变 (JSON file is empty, all files can be deleted, keep original list unchanged)
+        return true;
+    }
+    
+    // 将JSON内容加载到内存map中 (Load JSON content into memory map)
+    std::unordered_map<std::string, int> common_files_map;
+    yyjson_obj_iter iter = yyjson_obj_iter_with(root);
+    yyjson_val *key, *val;
+    while ((key = yyjson_obj_iter_next(&iter))) {
+        val = yyjson_obj_iter_get_val(key);
+        if (yyjson_is_str(key) && yyjson_is_str(val)) {
+            const char* key_str = yyjson_get_str(key);
+            const char* val_str = yyjson_get_str(val);
+            if (key_str && val_str) {
+                // 手动解析字符串为整数，避免使用try-catch (Manually parse string to int, avoiding try-catch)
+                char* endptr;
+                long count = std::strtol(val_str, &endptr, 10);
+                // 检查转换是否成功且值为正数 (Check if conversion succeeded and value is positive)
+                if (endptr != val_str && *endptr == '\0' && count > 0 && count <= INT_MAX) {
+                    common_files_map[std::string(key_str)] = static_cast<int>(count);
+                }
+            }
+        }
+    }
+    
+    yyjson_doc_free(doc);
+    
+    // 处理去重和计数修改，直接修改target_files列表 (Process deduplication and count modification, modify target_files list directly)
+    std::vector<std::string> files_to_keep; // 实际需要删除的文件 (Files that actually need to be deleted)
+    
+    for (const auto& file_path : target_files) {
+        auto it = common_files_map.find(file_path);
+        if (it != common_files_map.end()) {
+            // 文件在公用列表中，计数减1 (File is in common list, decrease count by 1)
+            it->second--;
+            if (it->second <= 0) {
+                // 计数为0或负数，可以删除JSON条目 (Count is 0 or negative, can delete file and JSON entry)
+                common_files_map.erase(it); // 从map中移除 (Remove from map)
+            }
+            // 如果计数>0，就什么都不管，重新写入进去
+        } else {
+            // 文件不在公用列表中，直接删除 (File is not in common list, delete directly)
+            files_to_keep.push_back(file_path);
+        }
+    }
+    
+    // 直接修改输入的target_files列表 (Modify input target_files list directly)
+    target_files = std::move(files_to_keep);
+    
+    // 检查map是否为空，如果为空则删除JSON文件 (Check if map is empty, delete JSON file if empty)
+    if (common_files_map.empty()) {
+        // 删除JSON文件 (Delete JSON file)
+        std::remove(json_path.c_str());
+        return true;
+    }
+    
+    // 重新写入JSON文件 (Rewrite JSON file)
+    // 创建新的JSON文档 (Create new JSON document)
+    yyjson_mut_doc* mut_doc = yyjson_mut_doc_new(NULL);
+    if (!mut_doc) return false;
+    
+    yyjson_mut_val* mut_root = yyjson_mut_obj(mut_doc);
+    if (!mut_root) {
+        yyjson_mut_doc_free(mut_doc);
+        return false;
+    }
+    yyjson_mut_doc_set_root(mut_doc, mut_root);
+    
+    // 将更新后的map内容写入JSON (Write updated map content to JSON)
+    for (const auto& pair : common_files_map) {
+        yyjson_mut_val* key_val = yyjson_mut_str(mut_doc, pair.first.c_str());
+        // 将整数转换为字符串并复制到文档内存中 (Convert integer to string and copy to document memory)
+        std::string count_str = std::to_string(pair.second);
+        yyjson_mut_val* val_val = yyjson_mut_strcpy(mut_doc, count_str.c_str());
+        if (!key_val || !val_val || !yyjson_mut_obj_put(mut_root, key_val, val_val)) {
+            yyjson_mut_doc_free(mut_doc);
+            return false;
+        }
+    }
+    
+    // 写入文件 (Write to file)
+    return WriteJsonFile(json_path, mut_doc, true);
+}
+
 } // namespace tj

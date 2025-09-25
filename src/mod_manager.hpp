@@ -203,7 +203,8 @@ public:
      * @param error_callback 错误回调函数
      * @return 成功返回true，失败返回false
      */
-    bool RemoveModFilesFromCache(ProgressCallback progress_callback,
+    bool RemoveModFilesFromCache(const std::string& mod_common_path,
+                                ProgressCallback progress_callback,
                                 ErrorCallback error_callback,
                                 std::stop_token stop_token);
     

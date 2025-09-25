@@ -100,6 +100,16 @@ public:
      */
     static std::string GetNestedJsonValue(const std::string& json_path, const std::string& root_key, const std::string& nested_key);
 
+    /**
+     * MOD文件去重处理函数 - 处理mod_file_common.json的去重操作
+     * MOD file deduplication function - Process deduplication for mod_file_common.json
+     * @param json_path mod_file_common.json文件路径 (mod_file_common.json file path)
+     * @param target_files 需要去重的文件路径列表，函数会直接修改此列表 (List of file paths to deduplicate, function will modify this list directly)
+     * @return 成功返回true，失败返回false (Returns true on success, false on failure)
+     */
+    static bool ProcessModFileCommonDeduplication(const std::string& json_path, 
+                                                  std::vector<std::string>& target_files);
+
     
 
     /**

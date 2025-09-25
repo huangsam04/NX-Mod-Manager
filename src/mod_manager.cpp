@@ -660,10 +660,15 @@ size_t ModManager::CountModFilesToRemoveWithProgress(const std::string& mod_sour
 }
 
 // 基于缓存路径删除文件 (Remove files based on cached paths)
-bool ModManager::RemoveModFilesFromCache(ProgressCallback progress_callback,
+bool ModManager::RemoveModFilesFromCache(const std::string& mod_common_path,
+                                        ProgressCallback progress_callback,
                                         ErrorCallback error_callback,
                                         std::stop_token stop_token) {
     bool overall_success = true;
+    
+    // 对cached_target_files进行去重处理（依据mod_file_common.json内容去重）
+    tj::JsonManager::ProcessModFileCommonDeduplication(mod_common_path, cached_target_files);
+    
     size_t processed_files = 0;
     size_t total_files = cached_target_files.size();
     
@@ -858,8 +863,10 @@ bool ModManager::uninstallModFromFolder(const std::string& folder_path,
         return false;
     }
     
+    std::string mod_common_path = GetModFileCommonPath(folder_path);
+    
     // 阶段2：基于缓存的路径进行删除 (Phase 2: Delete based on cached paths)
-    bool overall_result = RemoveModFilesFromCache(progress_callback, error_callback, stop_token);
+    bool overall_result = RemoveModFilesFromCache(mod_common_path, progress_callback, error_callback, stop_token);
     
     if (!overall_result && error_callback) {
         error_callback(UNINSTALLED_ERROR);
@@ -963,21 +970,14 @@ bool ModManager::uninstallModFromZipDirect(const std::string& zip_path,
         return a < b;
     });
     
-    // // 输出cached_target_files到日志文件进行调试 (Output cached_target_files to log for debugging)
-    // utils::Logger::Info("=== ZIP卸载文件列表开始 ===");
-    // utils::Logger::Info("总文件数量: " + std::to_string(cached_target_files.size()));
-    // for (size_t i = 0; i < cached_target_files.size(); ++i) {
-    //     utils::Logger::Info("[" + std::to_string(i + 1) + "/" + std::to_string(cached_target_files.size()) + "] " + cached_target_files[i]);
-    // }
-    // utils::Logger::Info("=== ZIP卸载文件列表结束 ===");
-    // return true;
 
     if (progress_callback) {
         progress_callback(0, valid_file_count, CALCULATE_FILES, false, 0.0f, "", COLOR_BLUE);
     }
     
+    std::string mod_common_path = GetModFileCommonPath(zip_path);
     // 调用RemoveModFilesFromCache函数完成实际的文件删除 (Call RemoveModFilesFromCache to perform actual file deletion)
-    return RemoveModFilesFromCache(progress_callback, error_callback, stop_token);
+    return RemoveModFilesFromCache(mod_common_path, progress_callback, error_callback, stop_token);
 
     
 }
@@ -2448,7 +2448,7 @@ std::string ModManager::GetFilePath(const std::string& path) {
     for (size_t i = 0; i < path.length(); ++i) {
         if (path[i] == '/') {
             slash_count++;
-            if (slash_count == 3) {
+            if (slash_count == 4) {
                 pos = i;
                 break;
             }
