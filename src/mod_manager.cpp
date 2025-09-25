@@ -1424,6 +1424,11 @@ bool ModManager::installModFromFolder(const std::string& folder_path,
                             closedir(dir);
                             return total_count;
                         }
+
+                        // 缓存发生冲突且通过CRC32校验的目标文件路径
+                        cached_conflicting_files.push_back(target_file_path);
+                        // 跳过这个文件路径
+                        continue;
                         
                     }
                     
@@ -1520,39 +1525,6 @@ bool ModManager::installModFromFolder(const std::string& folder_path,
     }
 
 
-    // // 对cached_files进行浅度排序，确保同目录文件相邻 (Sort cached_files by shallow depth, ensuring files in same directory are adjacent)
-    // auto sort_start = std::chrono::high_resolution_clock::now();
-    
-    // // 自定义排序比较函数：按目录路径分组，实现完全目录聚集 (Custom sort comparator: group by directory path, achieve complete directory clustering)
-    // std::sort(cached_files.begin(), cached_files.end(), [](const FileInfo& a, const FileInfo& b) {
-    //     // 提取目录路径 (Extract directory paths)
-    //     std::string dir_a = a.target_path.substr(0, a.target_path.find_last_of('/'));
-    //     std::string dir_b = b.target_path.substr(0, b.target_path.find_last_of('/'));
-        
-    //     // 如果目录不同，按目录路径排序 (If directories differ, sort by directory path)
-    //     if (dir_a != dir_b) {
-    //         return dir_a < dir_b;
-    //     }
-        
-    //     // 同目录内直接按完整路径排序，确保目录聚集 (Same directory, sort by full path to ensure directory clustering)
-    //     return a.target_path < b.target_path;
-    // });
-    
-    // auto sort_end = std::chrono::high_resolution_clock::now();
-    // auto sort_duration = std::chrono::duration_cast<std::chrono::milliseconds>(sort_end - sort_start);
-    
-    // utils::Logger::Info("文件排序完成，耗时: " + std::to_string(sort_duration.count()) + "ms");
-    
-    // // 打印排序后的cached_files路径顺序用于分析 (Print sorted cached_files path order for analysis)
-    // utils::Logger::Info("=== 排序后文件顺序分析 ===");
-    // for (size_t i = 0; i < cached_files.size(); ++i) {
-    //     utils::Logger::Info("[" + std::to_string(i) + "] 目标: " + cached_files[i].target_path);
-    // }
-    // utils::Logger::Info("=== 总计 " + std::to_string(cached_files.size()) + " 个文件 ===");
-
-    // return false;
-
-
     // 批量创建所有目录 (Batch create all directories)
     if (!createDirectoriesBatch(directories_to_create, progress_callback, total_files, error_callback, stop_token)) {
         // 创建失败时及时清除目录列表，释放内存 (Clear directory list promptly on failure to free memory)
@@ -1592,6 +1564,14 @@ bool ModManager::copyFilesBatch(const std::vector<FileInfo>& file_info_list,
 
     int copied_files = 0; // 已复制文件数量 (Number of copied files)
     int total_files = file_info_list.size();
+    
+    if (total_files == 0) {
+        if (error_callback) {
+            error_callback("请勿安装重复的MOD！");
+        }
+        return false;
+    }
+
     // 已经复制的文件路径
     std::vector<std::string> copied_files_list;
     
@@ -1890,167 +1870,6 @@ cleanup:
      
      return false;
 }
-
-// // 批量复制文件（简化版本，不聚集小文件，直接按顺序写入），不如带聚合的，备用不删了
-// bool ModManager::copyFilesBatch2(const std::vector<FileInfo>& file_info_list,
-//                                 ProgressCallback progress_callback,
-//                                 ErrorCallback error_callback,
-//                                 std::stop_token stop_token) {
-
-//     int copied_files = 0; // 已复制文件数量 (Number of copied files)
-//     int total_files = file_info_list.size();
-    
-//     // SD卡块对齐优化策略 (SD Card Block Alignment Optimization Strategy)
-//     const size_t SD_BLOCK_SIZE = 64 * 1024; // 64KB SD卡块大小
-//     const size_t ALIGNED_BUFFER_SIZE = 32 * 1024 * 1024; // 32MB 对齐缓冲区
-    
-//     // 分配块对齐缓冲区 (Allocate block-aligned buffers)
-//     // Switch平台使用memalign进行内存对齐到SD卡块边界
-//     char* aligned_buffer = (char*)memalign(SD_BLOCK_SIZE, ALIGNED_BUFFER_SIZE + SD_BLOCK_SIZE);
-    
-//     if (!aligned_buffer) {
-//         if (error_callback) {
-//             error_callback("内存分配失败 (Memory allocation failed)");
-//         }
-//         return false;
-//     }
-    
-//     /* SD卡优化策略总结 (SD Card Optimization Strategy Summary):
-//      * 1. 块对齐写入：所有写入操作对齐到64KB块边界，避免跨块写入
-//      * 2. 顺序I/O优化：按文件路径排序，减少随机访问模式
-//      * 3. 直接写入：不聚集小文件，每个文件直接按顺序写入
-//      * 4. 内存对齐：缓冲区对齐到块边界，提高传输效率
-//      * 5. 块级缓存：使用64KB整数倍缓冲区，匹配SD卡特性
-//      * 6. 写入地址对齐：确保文件写入位置对齐到块边界
-//      * 7. 智能填充：不足块大小的数据进行零填充对齐
-//      */
-    
-//     bool overall_success = true;
-    
-//     // 直接按顺序处理所有文件 (Process all files directly in order)
-//     for (const auto& file_info : file_info_list) {
-//         // 检查是否需要停止 (Check if stop is requested)
-//         if (stop_token.stop_requested()) {
-//             free(aligned_buffer);
-//             return false;
-//         }
-        
-//         // 打开源文件 (Open source file)
-//         FILE* source_file = fopen(file_info.source_path.c_str(), "rb");
-//         if (!source_file) {
-//             if (error_callback) {
-//                 error_callback(CANT_OPEN_FILE + file_info.source_path);
-//             }
-//             free(aligned_buffer);
-//             return false;
-//         }
-        
-//         // SD卡块对齐缓冲区优化 (SD Card block-aligned buffer optimization)
-//         setvbuf(source_file, nullptr, _IOFBF, ALIGNED_BUFFER_SIZE);
-        
-//         long file_size = static_cast<long>(file_info.file_size);
-        
-//         // 打开目标文件 (Open destination file)
-//         FILE* dest_file = fopen(file_info.target_path.c_str(), "wb");
-//         if (!dest_file) {
-//             fclose(source_file);
-//             if (error_callback) {
-//                 error_callback(CANT_CREATE_DIR + file_info.target_path + ", errno: " + std::to_string(errno));
-//             }
-//             free(aligned_buffer);
-//             return false;
-//         }
-        
-//         // SD卡块对齐写入缓冲区 (SD Card block-aligned write buffer)
-//         setvbuf(dest_file, nullptr, _IOFBF, ALIGNED_BUFFER_SIZE);
-        
-//         bool file_success = true;
-        
-//         // 提前提取文件名，避免重复计算 (Extract filename early to avoid repeated calculation)
-//         size_t last_slash = file_info.source_path.find_last_of('/');
-//         const char* filename_ptr = (last_slash != std::string::npos) ? 
-//             file_info.source_path.c_str() + last_slash + 1 : file_info.source_path.c_str();
-        
-//         // SD卡块对齐分块复制文件 (SD Card block-aligned chunked copy of files)
-//         size_t total_read = 0;
-//         int last_progress = -1;
-        
-//         while (total_read < (size_t)file_size && file_success) {
-//             // 在文件复制过程中检查是否需要停止 (Check if stop is requested during file copy)
-//             if (stop_token.stop_requested()) {
-//                 fclose(source_file);
-//                 fclose(dest_file);
-//                 free(aligned_buffer); // 使用free释放memalign分配的内存
-//                 return false;
-//             }
-            
-//             // 计算块对齐的读取大小 (Calculate block-aligned read size)
-//             size_t remaining = (size_t)file_size - total_read;
-//             size_t to_read = std::min(ALIGNED_BUFFER_SIZE, remaining);
-            
-//             // 如果是最后一块且不足块大小，对齐到块边界 (If last chunk and less than block size, align to block boundary)
-//             size_t aligned_read = to_read;
-//             if (remaining < ALIGNED_BUFFER_SIZE && (to_read % SD_BLOCK_SIZE) != 0) {
-//                 aligned_read = ((to_read + SD_BLOCK_SIZE - 1) / SD_BLOCK_SIZE) * SD_BLOCK_SIZE;
-//                 // 清零填充区域 (Zero-fill padding area)
-//                 memset(aligned_buffer + to_read, 0, aligned_read - to_read);
-//             }
-            
-//             size_t bytes_read = fread(aligned_buffer, 1, to_read, source_file);
-//             if (bytes_read > 0) {
-//                 // SD卡块对齐写入 (SD Card block-aligned write)
-//                 size_t write_size = (remaining < ALIGNED_BUFFER_SIZE && (bytes_read % SD_BLOCK_SIZE) != 0) ? aligned_read : bytes_read;
-                
-//                 if (fwrite(aligned_buffer, 1, write_size, dest_file) != write_size) {
-//                     file_success = false;
-//                     break;
-//                 }
-//                 total_read += bytes_read;
-                
-//                 // 更新文件级进度 (Update file-level progress)
-//                 if (progress_callback && file_size > 8 * 1024 * 1024) { // 只对大于8MB的文件显示文件级进度
-//                     int progress_percent = (int)((total_read * 100) / file_size);
-//                     // 实时更新进度，不限制更新频率 (Real-time progress update without frequency limitation)
-//                     progress_callback(copied_files, total_files, filename_ptr, true, (float)progress_percent);
-//                     last_progress = progress_percent;
-//                 }
-//             }
-//             if (bytes_read < to_read) break;
-//         }
-         
-//          // 统一的错误处理 (Unified error handling)
-//          if (!file_success && error_callback) {
-//              if (ferror(source_file)) {
-//                  error_callback(CANT_READ_ERROR + file_info.source_path);
-//              } else if (ferror(dest_file)) {
-//                  error_callback(CANT_WRITE_ERROR + file_info.target_path);
-//              } else {
-//                  error_callback(CANT_WRITE_ERROR + file_info.target_path);
-//              }
-//          }
-         
-         
-//          // 关闭文件句柄 (Close file handles)
-//          fclose(source_file);
-//          fclose(dest_file);
-         
-//          if (!file_success) {
-//              overall_success = false;
-//          } else {
-//              copied_files++;
-             
-//              // 更新总体进度 (Update overall progress)
-//              if (progress_callback) {
-//                  progress_callback(copied_files, total_files, filename_ptr, false, 0.0f);
-//              }
-//          }
-//     }
-    
-//     // 清理块对齐缓冲区 (Clean up block-aligned buffers)
-//     free(aligned_buffer); // 使用free释放memalign分配的内存
-    
-//     return overall_success;
-// }
 
 // 清理已创建的目录函数 (Clean up created directories function)
 void ModManager::cleanupCreatedDirectories(const std::vector<std::string>& directories, 
