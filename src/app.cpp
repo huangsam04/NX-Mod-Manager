@@ -7665,11 +7665,11 @@ void App::newUpdateDialogCopyProgress(){
             return;
         }
 
-        this->audio_manager.PlayCancelSound();
+        
         // 取消添加任务
         if (add_task.valid()) {
             add_task.request_stop(); // 请求停止添加任务 (Request to stop add task)
-            
+            this->audio_manager.PlayCancelSound();
 
             std::string files_success = "0";
             std::string files_false = "0";
@@ -7748,7 +7748,7 @@ void App::newUpdateDialogCopyProgress(){
             
 
         } else {
-            
+
             this->mod_uninstalling = false;
             // 处理异步任务失败情况，error_msg是报错信息，如果没有具体报错，就用默认报错信息。
             std::string error_msg;
