@@ -1,11 +1,8 @@
 <div align="center">
-  <img src="./assets/icon.jpg" width="200">
-  <br>
+  <img src="./assets/icon.jpg" width="200"><br>
+
+  <h1>NX Mod Manager</h1>
 </div>
-
-<div align="center">
-
-# NX Mod Manager
 
 [中文](./README.md) [English](./README_EN.md)
 
