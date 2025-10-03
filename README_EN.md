@@ -1,5 +1,7 @@
 # NX Mod Manager
 
+[中文](./README.md) [English](./README_EN.md)
+
 A mod manager designed specifically for Nintendo Switch, supporting multi-language interface, audio feedback, name mapping, and providing intuitive mod installation, uninstallation, and management functions.
 
 MODs are installed using copy method. For large MODs, the installation speed is slower, but considering the convenience of backing up the MODS2 folder, the copy installation method is adopted.
