@@ -1,6 +1,6 @@
 # NX Mod Manager
 
-**Note**: For English users, please see README_EN.md
+[中文 帮助](./README.md) [English](./README_EN.md)
 
 一个专为Nintendo Switch设计的模组管理器，支持多语言，音效反馈，名称映射，提供直观的模组添加、安装、卸载和管理功能。
 
